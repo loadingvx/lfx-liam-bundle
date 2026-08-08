@@ -1,11 +1,13 @@
-# mise 管理本工程的 Python / uv。用法示例：
+# mise 管理本工程的 Python / uv。
+# 与 lfx / 本包 requires-python 最低版本对齐：3.10
+# 用法示例：
 #   mise install
 #   mise exec -- uv sync --group dev
 #   mise exec -- uv run pytest
 #   mise exec -- uv run lfx extension validate .
 
 [tools]
-python = "3.13"
+python = "3.10"
 uv = "latest"
 
 [env]

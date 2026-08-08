@@ -11,11 +11,7 @@ from langchain_core.embeddings import Embeddings
 from lfx_liam_bundle.graphrag.kg_store import load_index
 from lfx_liam_bundle.graphrag.llm_utils import invoke_llm
 from lfx_liam_bundle.graphrag.models import GraphIndex
-from lfx_liam_bundle.graphrag.provenance import (
-    collect_local_search_citations,
-    format_sources_block,
-    link_provenance,
-)
+from lfx_liam_bundle.graphrag.provenance import collect_local_search_citations, format_sources_block
 from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
 LOCAL_ANSWER_PROMPT = """你是 GraphRAG Local Search 助手。请仅依据给定上下文回答用户问题。
@@ -61,10 +57,6 @@ def build_local_context(
             "请先用完整 GraphRAG「入库建图」完成索引。"
         )
         raise ValueError(msg)
-
-    # 确保双向索引可用（兼容旧库）
-    if any(not u.entity_ids for u in index.text_units) and any(e.text_unit_ids for e in index.entities):
-        link_provenance(index)
 
     qvec = embedding.embed_query(query)
     missing = [e for e in index.entities if not e.description_embedding]

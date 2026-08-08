@@ -13,7 +13,7 @@ from lfx_liam_bundle.components.liam.kb_maintain import GraphRAGKBMaintainCompon
 from lfx_liam_bundle.components.liam.kb_provenance import GraphRAGKBProvenanceComponent
 from lfx_liam_bundle.components.liam.kb_retrieve import GraphRAGKBRetrieveComponent
 
-__version__ = "0.3.1"
+__version__ = "0.0.1"
 
 __all__ = [
     "GraphRAGKBBuildComponent",

@@ -4,6 +4,9 @@
 
 本仓库用 **mise + uv** 管理工具链（见 `mise.toml`）。
 
+- **最低 / 本地开发 Python：3.10**（与 `lfx`、`requires-python = ">=3.10,<3.15"` 对齐）
+- 有 3.10 即可开发、测试、发版；更高版本（3.11–3.14）亦可运行，但本机默认钉在 3.10
+
 ```bash
 ./scripts/setup-env.sh
 # 等价
@@ -66,7 +69,7 @@ GitHub Actions（`.github/workflows/python-publish.yml`）在 **Release publishe
    - `pyproject.toml` → `project.version`
    - `src/lfx_liam_bundle/__init__.py` → `__version__`
    - 根目录与包内两份 `extension.json` → `version`
-2. `python -m build` 产出 sdist / wheel
+2. 校验 `requires-python` 允许 3.10，并用 **Python 3.10** 执行 `python -m build`
 3. 通过 Trusted Publishing（OIDC + Environment `pypi`）上传到 PyPI：`lfx-liam-bundle`
 
 本地门禁仍用：`make check`（validate + lint + test），再 `make build`。

@@ -34,13 +34,19 @@ run_uv() {
   exit 1
 }
 
-echo ">>> mise install（python / uv，失败时回退系统工具）"
+echo ">>> mise install（Python 3.10 / uv，失败时回退系统工具）"
 if ! mise install; then
   echo "提示: mise install 未完全成功，将尝试使用已有 python/uv 继续"
 fi
 
-echo ">>> uv sync（含 dev 依赖；lfx 指向 ../langflow/src/lfx）"
-run_uv sync --group dev
+# 与 mise.toml / .python-version 对齐，避免 uv 误用本机更高版本 Python
+if [[ ! -f .python-version ]]; then
+  echo "3.10" > .python-version
+fi
+
+echo ">>> uv sync（Python 3.10 + dev；lfx 指向 ../langflow/src/lfx）"
+run_uv sync --python 3.10 --group dev
+run_uv run python -c "import sys; v=sys.version_info; assert v[:2]==(3,10), f'期望 Python 3.10，当前为 {sys.version}'; print('Python OK:', sys.version.split()[0])"
 
 echo
 echo "环境就绪。"

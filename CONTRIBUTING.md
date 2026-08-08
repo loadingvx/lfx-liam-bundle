@@ -11,7 +11,8 @@
 
 ### 前置条件
 
-- [mise](https://mise.jdx.dev/)（管理 Python / uv）
+- [mise](https://mise.jdx.dev/)（管理 Python / uv；本仓库钉 **Python 3.10**）
+- Python 最低 3.10（与 `lfx` / `requires-python` 一致；有 3.10 即可）
 - 目录布局建议：
 
 ```text

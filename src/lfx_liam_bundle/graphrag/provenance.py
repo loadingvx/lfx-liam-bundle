@@ -171,8 +171,9 @@ def entity_to_sources(index: GraphIndex, entity_key: str) -> dict[str, Any]:
         "source_count": len(sources),
         "relationships": rels[:40],
         "message": (
-            f"实体「{entity.title}」对应 {len(sources)} 个原文片段"
-            + ("。" if sources else "（缺少 text_unit 链接，请重新入库建图以回填溯源）。")
+            f"实体「{entity.title}」对应 {len(sources)} 个原文片段。"
+            if sources
+            else f"实体「{entity.title}」没有关联原文片段（建图时未写入 text_unit_ids）。"
         ),
     }
 
@@ -184,11 +185,6 @@ def text_unit_to_graph(index: GraphIndex, text_unit_id: str) -> dict[str, Any]:
     if unit is None:
         msg = f"未找到文本单元「{text_unit_id}」。"
         raise ValueError(msg)
-
-    # 若反向索引为空，尝试从正向链接现场回填（兼容旧库）
-    if not unit.entity_ids and not unit.relationship_ids:
-        link_provenance(index)
-        unit = next((u for u in index.text_units if u.id == uid), unit)
 
     ents_by_id = {e.id: e for e in index.entities}
     rels_by_id = {r.id: r for r in index.relationships}
@@ -252,7 +248,6 @@ def document_to_graph(index: GraphIndex, document_id: str) -> dict[str, Any]:
         msg = f"未找到文档「{document_id}」。"
         raise ValueError(msg)
 
-    link_provenance(index)
     units = [u for u in index.text_units if u.id in set(doc.text_unit_ids) or u.document_id == doc.id]
     entity_ids: list[str] = []
     for u in units:
