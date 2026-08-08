@@ -11,8 +11,9 @@
 
 - 对齐微软 data_model 的双向溯源：`TextUnit.entity_ids/relationship_ids/covariate_ids`，`Document↔TextUnit`。
 - 建库流水线 `link_provenance`：抽取后回填正向/反向索引并落库。
-- 新组件 **GraphRAG 溯源查询**：实体→原文、原文→实体、文档→图元素、重建双向索引。
+- 新组件 **GraphRAG 溯源查询**：实体→原文、原文→实体、文档→图元素。
 - Local Search 输出可审计 citations，答案附「可核对原文出处」。
+- 去掉旧库迁移/重建双向索引、metadata 边遗留 UI，以及未使用的 GraphRetriever 适配器与依赖。
 
 ## [0.3.0] - 2026-08-09
 
@@ -33,7 +34,7 @@
 
 ### Removed
 
-- 以「仅抽实体名 + metadata 边遍历」冒充 GraphRAG 的建库/检索主路径（遗留函数仍保留兼容）。
+- 以「仅抽实体名 + metadata 边遍历」冒充 GraphRAG 的建库/检索主路径。
 
 ## [0.2.0] - 2026-08-08
 

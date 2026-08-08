@@ -13,13 +13,12 @@ from lfx_liam_bundle.graphrag.models import (
     TextUnit,
     merge_graph_indexes,
 )
-from lfx_liam_bundle.graphrag.retrieve import SEARCH_MODES, traversal_strategy_names
+from lfx_liam_bundle.graphrag.retrieve import SEARCH_MODES
 from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
 
 def test_search_modes_are_local_global() -> None:
     assert SEARCH_MODES == ["Local Search", "Global Search"]
-    assert traversal_strategy_names() == SEARCH_MODES
 
 
 def test_merge_graph_primitives_dedupes() -> None:

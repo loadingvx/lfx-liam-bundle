@@ -58,8 +58,3 @@ def retrieve_documents(
         )
     msg = f"不支持的检索模式：{mode}。请选择 Local Search 或 Global Search。"
     raise ValueError(msg)
-
-
-def traversal_strategy_names() -> list[str]:
-    """兼容旧测试/字段：现为检索模式列表。"""
-    return list(SEARCH_MODES)

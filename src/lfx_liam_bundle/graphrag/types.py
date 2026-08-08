@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
 from lfx.schema.data import Data
@@ -10,9 +10,6 @@ from lfx.schema.data import Data
 KB_MARKER = "_liam_graphrag_kb"
 Backend = Literal["astradb", "arangodb"]
 Status = Literal["ready", "empty", "error"]
-
-DEFAULT_EDGE_FIELDS = ["entities", "keywords"]
-DEFAULT_EDGE_DEFINITION = "entities,entities"
 
 
 @dataclass
@@ -22,8 +19,6 @@ class GraphRAGKnowledgeBase:
     backend: Backend
     name: str
     collection_name: str
-    edge_fields: list[str] = field(default_factory=lambda: list(DEFAULT_EDGE_FIELDS))
-    edge_definition: str = DEFAULT_EDGE_DEFINITION
     status: Status = "empty"
     message: str = "知识库已连接，尚未入库。"
     document_count: int = 0
@@ -59,8 +54,6 @@ class GraphRAGKnowledgeBase:
         data.pop(KB_MARKER, None)
         allowed = {f.name for f in cls.__dataclass_fields__.values()}  # type: ignore[attr-defined]
         filtered = {k: v for k, v in data.items() if k in allowed}
-        if "edge_fields" in filtered and filtered["edge_fields"] is None:
-            filtered["edge_fields"] = list(DEFAULT_EDGE_FIELDS)
         return cls(**filtered)
 
     @classmethod
@@ -84,8 +77,6 @@ class GraphRAGKnowledgeBase:
             "backend": self.backend,
             "name": self.name,
             "collection_name": self.collection_name,
-            "edge_fields": self.edge_fields,
-            "edge_definition": self.edge_definition,
             "status": self.status,
             "message": self.message,
             "document_count": self.document_count,

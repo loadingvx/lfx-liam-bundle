@@ -179,15 +179,6 @@ wheels = [
 ]
 
 [[package]]
-name = "backoff"
-version = "2.2.1"
-source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
-sdist = { url = "https://mirrors.aliyun.com/pypi/packages/47/d7/5bbeb12c44d7c4f2fb5b56abce497eb5ed9f34d85701de869acedd602619/backoff-2.2.1.tar.gz", hash = "sha256:03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba" }
-wheels = [
-    { url = "https://mirrors.aliyun.com/pypi/packages/df/73/b6e24bd22e6720ca8ee9a85a0c4a2971af8497d8f3193fa05390cbd46e09/backoff-2.2.1-py3-none-any.whl", hash = "sha256:63579f9a0628e06278f7e47b7d7d5b6ce20dc65c5e96a6f3ca99a6adca0396e8" },
-]
-
-[[package]]
 name = "beautifulsoup4"
 version = "4.15.0"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
@@ -874,23 +865,6 @@ wheels = [
 ]
 
 [[package]]
-name = "graph-retriever"
-version = "0.8.0"
-source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
-dependencies = [
-    { name = "immutabledict" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://mirrors.aliyun.com/pypi/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://mirrors.aliyun.com/pypi/simple" }, marker = "python_full_version == '3.11.*'" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://mirrors.aliyun.com/pypi/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "pytest" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://mirrors.aliyun.com/pypi/packages/ef/d2/7821dfc262c3cecfad3e61eb16d425189eac68a780e2386fd50b04b24f53/graph_retriever-0.8.0.tar.gz", hash = "sha256:e61f1cb27184e8d4559ece6de0a6ea18920908ffbae945051f9a01380af73347" }
-wheels = [
-    { url = "https://mirrors.aliyun.com/pypi/packages/fd/ff/89506882321b0f1e2c720aff109ec46c7c74ef1e4aafbb62298fb8a387a0/graph_retriever-0.8.0-py3-none-any.whl", hash = "sha256:030bfd1976fd4eda358e3296670dc9a6c2209fcca5ad6c0281534a73d5346d01" },
-]
-
-[[package]]
 name = "greenlet"
 version = "3.5.4"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
@@ -1119,15 +1093,6 @@ wheels = [
 ]
 
 [[package]]
-name = "immutabledict"
-version = "4.3.1"
-source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
-sdist = { url = "https://mirrors.aliyun.com/pypi/packages/1d/e6/718471048fea0366c3e3d1df3acfd914ca66d571cdffcf6d37bbcd725708/immutabledict-4.3.1.tar.gz", hash = "sha256:f844a669106cfdc73f47b1a9da003782fb17dc955a54c80972e0d93d1c63c514" }
-wheels = [
-    { url = "https://mirrors.aliyun.com/pypi/packages/a3/ce/f9018bf69ae91b273b6391a095e7c93fa5e1617f25b6ba81ad4b20c9df10/immutabledict-4.3.1-py3-none-any.whl", hash = "sha256:c9facdc0ff30fdb8e35bd16532026cac472a549e182c94fa201b51b25e4bf7bf" },
-]
-
-[[package]]
 name = "importlib-metadata"
 version = "9.0.0"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
@@ -1303,22 +1268,6 @@ wheels = [
 ]
 
 [[package]]
-name = "langchain-astradb"
-version = "1.0.0"
-source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
-dependencies = [
-    { name = "astrapy" },
-    { name = "langchain-core" },
-    { name = "numpy", version = "2.2.6", source = { registry = "https://mirrors.aliyun.com/pypi/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://mirrors.aliyun.com/pypi/simple" }, marker = "python_full_version == '3.11.*'" },
-    { name = "numpy", version = "2.5.1", source = { registry = "https://mirrors.aliyun.com/pypi/simple" }, marker = "python_full_version >= '3.12'" },
-]
-sdist = { url = "https://mirrors.aliyun.com/pypi/packages/b9/64/31e1e93c42e773fab6346dd2f304ec58c1f06debeb008efbddedd1b68345/langchain_astradb-1.0.0.tar.gz", hash = "sha256:23686094c74802862e92fb45141f89092472bfdedb373bfd8b748d4caeecc11f" }
-wheels = [
-    { url = "https://mirrors.aliyun.com/pypi/packages/70/b6/f68f71c95a8dc80540dff7e24406e312f733b014671a64ace7221f7fcb5c/langchain_astradb-1.0.0-py3-none-any.whl", hash = "sha256:867f07e3e328d48fc79243e336197695d2b1d79f6c5d161385322172eb7cb4fb" },
-]
-
-[[package]]
 name = "langchain-classic"
 version = "1.0.8"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
@@ -1355,25 +1304,6 @@ dependencies = [
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/65/3e/63af6b9d76d9be907c7c524d6ec18a2efed7e0e2d123fea0230d78dbd73f/langchain_core-1.5.3.tar.gz", hash = "sha256:a56457ac444fef41e9404443c187f0ecea708d36e816ea4ba9573c027f7d1a2d" }
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/36/e6/c7c39efe0bc7e1b7c3d8f54f85846e04c901913c3d3e99068b218558c6f1/langchain_core-1.5.3-py3-none-any.whl", hash = "sha256:48b56fa580277209594dd7baf837f5b9a2a3651613f34ff9fb1728b429df015f" },
-]
-
-[[package]]
-name = "langchain-graph-retriever"
-version = "0.8.0"
-source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
-dependencies = [
-    { name = "backoff" },
-    { name = "graph-retriever" },
-    { name = "immutabledict" },
-    { name = "langchain-core" },
-    { name = "networkx", version = "3.4.2", source = { registry = "https://mirrors.aliyun.com/pypi/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "networkx", version = "3.6.1", source = { registry = "https://mirrors.aliyun.com/pypi/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "pydantic" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://mirrors.aliyun.com/pypi/packages/b5/a3/97c2096e1554f721e1dd62d4867cc4104184e1926684e7961a4373365d48/langchain_graph_retriever-0.8.0.tar.gz", hash = "sha256:cd39b551bc3caf1c4bb83c380eb1d7df4de58a9cb56f700e3cd2b577b280be00" }
-wheels = [
-    { url = "https://mirrors.aliyun.com/pypi/packages/5c/b9/347f2bb6d50f7733c7b78b84ce872c3cc4b64bbfa479bc7f367a80b48957/langchain_graph_retriever-0.8.0-py3-none-any.whl", hash = "sha256:c359f03e8f8af33e15f24137b4f7a165add613b7eba4eb8cda9878891381fd71" },
 ]
 
 [[package]]
@@ -1662,10 +1592,7 @@ version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "astrapy" },
-    { name = "graph-retriever" },
-    { name = "langchain-astradb" },
     { name = "langchain-core" },
-    { name = "langchain-graph-retriever" },
     { name = "lfx" },
     { name = "networkx", version = "3.4.2", source = { registry = "https://mirrors.aliyun.com/pypi/simple" }, marker = "python_full_version < '3.11'" },
     { name = "networkx", version = "3.6.1", source = { registry = "https://mirrors.aliyun.com/pypi/simple" }, marker = "python_full_version >= '3.11'" },
@@ -1684,10 +1611,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "astrapy", specifier = ">=2.1.0,<3.0.0" },
-    { name = "graph-retriever", specifier = "==0.8.0" },
-    { name = "langchain-astradb", specifier = "~=1.0.0" },
     { name = "langchain-core", specifier = ">=0.3.0" },
-    { name = "langchain-graph-retriever", specifier = "==0.8.0" },
     { name = "lfx", editable = "../langflow/src/lfx" },
     { name = "networkx", specifier = ">=3.2" },
     { name = "python-arango", specifier = ">=8.0.0,<9.0.0" },

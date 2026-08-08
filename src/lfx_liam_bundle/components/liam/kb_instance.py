@@ -6,12 +6,8 @@ from lfx.custom.custom_component.component import Component
 from lfx.io import BoolInput, DropdownInput, MessageTextInput, Output, SecretStrInput, StrInput
 from lfx.schema.data import Data
 
-from lfx_liam_bundle.graphrag.kg_store import ensure_kg_schema
-from lfx_liam_bundle.graphrag.types import (
-    DEFAULT_EDGE_DEFINITION,
-    DEFAULT_EDGE_FIELDS,
-    GraphRAGKnowledgeBase,
-)
+from lfx_liam_bundle.graphrag.kg_store import ensure_kg_schema, load_index
+from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
 
 class GraphRAGKBInstanceComponent(Component):
@@ -53,14 +49,6 @@ class GraphRAGKBInstanceComponent(Component):
             value=True,
             info="目标集合不存在时自动创建。",
         ),
-        StrInput(
-            name="edge_definition",
-            display_name="兼容边定义（遗留）",
-            value=DEFAULT_EDGE_DEFINITION,
-            info="完整 GraphRAG 使用实体关系图与社区报告；此字段仅保留兼容，可忽略。",
-            advanced=True,
-        ),
-        # Astra
         MessageTextInput(
             name="api_endpoint",
             display_name="Astra API Endpoint",
@@ -77,7 +65,6 @@ class GraphRAGKBInstanceComponent(Component):
             value="default_keyspace",
             advanced=True,
         ),
-        # Arango
         MessageTextInput(
             name="arango_url",
             display_name="ArangoDB 地址",
@@ -103,7 +90,7 @@ class GraphRAGKBInstanceComponent(Component):
             display_name="Arango 图名称",
             value="",
             advanced=True,
-            info="留空则自动使用「集合名_graph」。",
+            info="留空则自动使用「前缀名_kg_graph」。",
         ),
     ]
 
@@ -113,13 +100,10 @@ class GraphRAGKBInstanceComponent(Component):
 
     def build_kb(self) -> Data:
         backend = "astradb" if self.backend == "AstraDB" else "arangodb"
-        edge_definition = (self.edge_definition or DEFAULT_EDGE_DEFINITION).strip()
         kb = GraphRAGKnowledgeBase(
             backend=backend,  # type: ignore[arg-type]
             name=(self.kb_name or "default").strip(),
             collection_name=(self.collection_name or "").strip(),
-            edge_fields=list(DEFAULT_EDGE_FIELDS),
-            edge_definition=edge_definition,
             api_endpoint=(self.api_endpoint or "").strip(),
             token=self.token or "",
             keyspace=(self.keyspace or "default_keyspace").strip(),
@@ -131,9 +115,6 @@ class GraphRAGKBInstanceComponent(Component):
         )
         try:
             ensure_kg_schema(kb, create_if_missing=bool(self.create_if_missing))
-            # 探测 chunks 是否已有数据
-            from lfx_liam_bundle.graphrag.kg_store import load_index
-
             try:
                 index = load_index(kb)
                 kb.document_count = len(index.text_units)

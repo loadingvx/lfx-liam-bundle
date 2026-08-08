@@ -99,7 +99,7 @@ make check
 feat: 支持 Arango 社区检索超时提示
 fix: Astra token 为空时给出中文错误
 docs: 补充安装到生产环境步骤
-test: 覆盖 edge_definition 解析边界
+test: 覆盖 Entity↔TextUnit 双向溯源
 ```
 
 ## 发布（维护者）

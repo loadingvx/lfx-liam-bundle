@@ -5,78 +5,85 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![LFX Extension](https://img.shields.io/badge/langflow-extension-0ea5e9.svg)](https://docs.langflow.org/extensions-quickstart)
 
-**完整 GraphRAG**（对齐 [微软 GraphRAG 默认 dataflow](https://microsoft.github.io/graphrag/index/default_dataflow/)）的 Langflow Extension：以知识库实例为边界，建库侧完成抽取/社区/报告，检索侧提供 Local Search 与 Global Search。
+[中文文档](README.zh-CN.md)
 
-后端支持：**AstraDB**、**ArangoDB**。
+A Langflow Extension that implements **full GraphRAG** aligned with the
+[Microsoft GraphRAG default dataflow](https://microsoft.github.io/graphrag/index/default_dataflow/).
+Indexing builds entities, communities, and reports around a knowledge-base instance;
+query supports Local Search and Global Search.
 
-## 与「真正 GraphRAG」对齐的能力
+Backends: **AstraDB**, **ArangoDB**.
 
-| 阶段 | 能力 | 本 Bundle |
-|------|------|-----------|
-| 建库 | TextUnit 组合 | ✅ |
-| 建库 | 实体 + 关系抽取 | ✅ |
-| 建库 | Data Gleaning 多轮补抽 | ✅ |
-| 建库 | 描述合并摘要 | ✅ |
-| 建库 | Claims/Covariates（可选） | ✅（默认关） |
-| 建库 | 分层社区检测 | ✅（Hierarchical Louvain；微软默认 Leiden） |
-| 建库 | 社区报告 | ✅ |
-| 建库 | TextUnit / 实体 / 报告向量化 | ✅ |
-| 检索 | Local Search | ✅ |
-| 检索 | Global Search Map-Reduce | ✅ |
-| 检索 | 动态社区选择 | ✅（可选） |
-| 溯源 | Entity↔TextUnit↔Document 双向链接 + 引用出处 | ✅ |
+## Capabilities
 
-## 组件
+| Stage | Capability | This bundle |
+|-------|------------|-------------|
+| Index | TextUnit composition | ✅ |
+| Index | Entity + relationship extraction | ✅ |
+| Index | Data Gleaning | ✅ |
+| Index | Description summarization | ✅ |
+| Index | Claims / Covariates (optional) | ✅ (off by default) |
+| Index | Hierarchical communities | ✅ (Louvain; Microsoft uses Leiden) |
+| Index | Community reports | ✅ |
+| Index | Embeddings for units / entities / reports | ✅ |
+| Query | Local Search | ✅ |
+| Query | Global Search (map-reduce) | ✅ |
+| Query | Dynamic community selection | ✅ (optional) |
+| Provenance | Entity ↔ TextUnit ↔ Document + citations | ✅ |
 
-| 侧 | 组件 | 作用 |
-|----|------|------|
-| 建库 | **GraphRAG 知识库** | 创建/连接实例，初始化知识模型集合 |
-| 建库 | **GraphRAG 入库建图** | 完整索引流水线（需 LLM + Embedding） |
-| 检索 | **GraphRAG 检索** | Local Search / Global Search |
-| 维护 | **GraphRAG 知识库维护** | 统计 / 清空（需确认语） |
-| 溯源 | **GraphRAG 溯源查询** | 实体↔原文↔文档 双向核对 |
+## Components
 
-## 推荐 Flow
+| Side | Component | Role |
+|------|-----------|------|
+| Build | **GraphRAG Knowledge Base** | Create / connect instance and schema |
+| Build | **GraphRAG Index Builder** | Full indexing pipeline (LLM + Embedding required) |
+| Query | **GraphRAG Retrieve** | Local Search / Global Search |
+| Ops | **GraphRAG Maintain** | Stats / clear (confirmation required) |
+| Provenance | **GraphRAG Provenance** | Entity ↔ source text ↔ document lookup |
+
+## Recommended flow
 
 ```text
-文档切分 ──► GraphRAG 入库建图 ◄── Embedding
-                ▲         ▲
-         GraphRAG 知识库   LLM
-                │
-                ▼
-         GraphRAG 检索 ──► 答案/上下文
-              ▲
-         Embedding + LLM（按模式）
+Split docs ──► GraphRAG Index Builder ◄── Embedding
+                    ▲           ▲
+         GraphRAG Knowledge Base   LLM
+                    │
+                    ▼
+             GraphRAG Retrieve ──► answer / context
+                    ▲
+           Embedding + LLM (by mode)
 ```
 
-1. 配置「GraphRAG 知识库」（AstraDB 或 ArangoDB；前缀名如 `liam_graphrag`）
-2. 「入库建图」接入文档、Embedding、LLM；设置 Gleaning 轮数
-3. 「GraphRAG 检索」选 Local（具体实体问题）或 Global（主题/全局问题）
+1. Configure **GraphRAG Knowledge Base** (AstraDB or ArangoDB; prefix e.g. `liam_graphrag`).
+2. Wire documents, Embedding, and LLM into **Index Builder**; set Gleaning rounds.
+3. Use **Retrieve**: Local for entity-centric questions, Global for thematic / corpus-wide questions.
 
-## 安装
+## Install
 
 ```bash
 pip install lfx-liam-bundle
-# 或
+# or local docker Langflow:
 ./scripts/deploy-to-docker.sh
 ```
 
-UI：Components 搜索 `GraphRAG` / `Liam`。
+In the UI, search Components for `GraphRAG` / `Liam`.
 
-## 依赖
+## Dependencies
 
-- `networkx`：分层社区
-- Astra：`langchain-astradb`、`astrapy`
-- Arango：`python-arango`
+- `networkx` — hierarchical communities
+- `astrapy` — AstraDB
+- `python-arango` — ArangoDB
 - `lfx>=1.11,<2`
 
-## 文档
+## Docs
 
-- [使用说明](docs/usage.md)
-- [架构说明](docs/architecture.md)
-- [开发指南](docs/development.md)
-- 官方 GraphRAG：[Indexing Dataflow](https://microsoft.github.io/graphrag/index/default_dataflow/) / [Local Search](https://microsoft.github.io/graphrag/query/local_search/) / [Global Search](https://microsoft.github.io/graphrag/query/global_search/)
+- [Usage](docs/usage.md) (Chinese)
+- [Architecture](docs/architecture.md) (Chinese)
+- [Development](docs/development.md) (Chinese)
+- Upstream GraphRAG: [Indexing](https://microsoft.github.io/graphrag/index/default_dataflow/) ·
+  [Local Search](https://microsoft.github.io/graphrag/query/local_search/) ·
+  [Global Search](https://microsoft.github.io/graphrag/query/global_search/)
 
-## 许可证
+## License
 
 [MIT](LICENSE)
