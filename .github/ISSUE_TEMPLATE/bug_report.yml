@@ -1,0 +1,66 @@
+name: Bug 报告
+description: 报告功能异常或不符合预期的行为
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提交前请先搜索是否已有相同 Issue。**不要**粘贴真实 Token、密码或生产连接串。
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 发生了什么
+      description: 用中文清楚描述现象与你期望的结果
+      placeholder: 例如：入库显示成功，但检索一直返回空列表……
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      description: 越具体越好（组件配置可脱敏）
+      placeholder: |
+        1. 选择 ArangoDB 后端……
+        2. 运行入库建图……
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 扩展版本
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: input
+    id: langflow-version
+    attributes:
+      label: Langflow / lfx 版本
+      placeholder: langflow 1.11.x / lfx 1.11.x
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: 知识库后端
+      options:
+        - AstraDB
+        - ArangoDB
+        - 两者都有 / 不确定
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 错误信息 / 日志（脱敏）
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已脱敏所有密钥与内网地址
+          required: true
+        - label: 我已用 `lfx extension list` 或 UI 确认扩展已加载
+          required: false

@@ -1,18 +1,22 @@
-"""检索侧：GraphRAG 检索（Astra 移植官方 GraphRetriever，Arango 自研）。"""
+"""检索侧：Local Search / Global Search。"""
 
 from __future__ import annotations
 
 from lfx.custom.custom_component.component import Component
 from lfx.helpers.data import docs_to_data
-from lfx.io import DropdownInput, HandleInput, IntInput, MultilineInput, NestedDictInput, Output, StrInput
+from lfx.io import BoolInput, DropdownInput, HandleInput, IntInput, MultilineInput, Output
 from lfx.schema.data import Data
-from lfx_liam_bundle.graphrag.retrieve import retrieve_documents, traversal_strategy_names
-from lfx_liam_bundle.graphrag.types import DEFAULT_EDGE_DEFINITION, GraphRAGKnowledgeBase
+
+from lfx_liam_bundle.graphrag.retrieve import SEARCH_MODES, retrieve_documents
+from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
 
 class GraphRAGKBRetrieveComponent(Component):
     display_name = "GraphRAG 检索"
-    description = "对 GraphRAG 知识库实例执行向量召回 + 图遍历检索（用法类似官方 Graph RAG）。"
+    description = (
+        "真正的 GraphRAG 检索：Local Search（实体邻域+原文）或 "
+        "Global Search（社区报告 Map-Reduce，可动态社区选择）。"
+    )
     name = "LiamGraphRAGRetrieve"
     icon = "Search"
 
@@ -28,91 +32,110 @@ class GraphRAGKBRetrieveComponent(Component):
             name="embedding_model",
             display_name="Embedding 模型",
             input_types=["Embeddings"],
-            info="应与入库时使用的模型一致。",
-            required=True,
+            info="Local Search 必需；应与建库时使用的模型一致。",
+            required=False,
+        ),
+        HandleInput(
+            name="llm",
+            display_name="语言模型 LLM",
+            input_types=["LanguageModel"],
+            info="Global Search 必需；Local Search 用于生成最终答案（推荐连接）。",
+            required=False,
         ),
         MultilineInput(
             name="search_query",
             display_name="检索问题",
             tool_mode=True,
             required=True,
-        ),
-        StrInput(
-            name="edge_definition",
-            display_name="边定义",
-            value=DEFAULT_EDGE_DEFINITION,
-            info="例如 entities,entities 或 mentions,Id()。留空则用知识库默认。",
+            info="Local：适合具体实体问题；Global：适合主题/全局总结类问题。",
         ),
         DropdownInput(
-            name="strategy",
-            display_name="遍历策略",
-            options=traversal_strategy_names(),
-            value=(traversal_strategy_names() or ["Eager"])[0],
-            info="Astra 路径使用 GraphRetriever 策略；Arango 路径主要使用深度参数。",
+            name="search_mode",
+            display_name="检索模式",
+            options=SEARCH_MODES,
+            value="Local Search",
+            info="Local：实体邻域+关系+社区摘要+原文；Global：社区报告 Map-Reduce。",
+        ),
+        BoolInput(
+            name="dynamic_community_selection",
+            display_name="Global 动态社区选择",
+            value=False,
+            advanced=True,
+            info="开启后从粗到细剪枝无关社区（对齐微软动态社区选择），降低无效 Map 成本。",
         ),
         IntInput(
-            name="top_k",
-            display_name="返回条数",
-            value=4,
+            name="community_level",
+            display_name="Global 社区层级",
+            value=0,
+            advanced=True,
+            info="0 为最粗层级。仅在关闭动态社区选择时生效。",
+        ),
+        IntInput(
+            name="top_k_entities",
+            display_name="Local 实体数",
+            value=8,
             advanced=True,
         ),
         IntInput(
-            name="depth",
-            display_name="遍历深度",
-            value=1,
+            name="top_k_chunks",
+            display_name="Local 原文片段数",
+            value=6,
             advanced=True,
-            info="Arango 图遍历深度；Astra 也可通过策略参数覆盖。",
         ),
-        NestedDictInput(
-            name="strategy_kwargs",
-            display_name="策略参数",
-            info="传给 GraphRetriever Strategy 的额外参数（如 start_k/select_k/max_depth）。",
+        BoolInput(
+            name="answer_with_llm",
+            display_name="Local 用 LLM 生成答案",
+            value=True,
             advanced=True,
+            info="关闭则输出检索上下文原文（便于自行接到 Prompt 组件）。",
         ),
     ]
 
     outputs = [
         Output(display_name="检索结果", name="results", method="search"),
-        Output(display_name="上下文文本", name="context", method="search_context"),
+        Output(display_name="答案/上下文", name="context", method="search_context"),
     ]
 
     _last_docs: list | None = None
+    _last_text: str | None = None
+    _last_meta: dict | None = None
 
-    def _search_docs(self):
+    def _run(self):
         kb = GraphRAGKnowledgeBase.from_data(self.kb_instance)
-        if kb.status == "empty" and kb.document_count == 0:
-            # 仍允许检索，但给出明确提示
-            self.log("知识库可能为空：若结果为空，请先运行「入库建图」。")
+        mode = self.search_mode or "Local Search"
+        if mode == "Global Search" and self.llm is None:
+            msg = "Global Search 必须连接 LLM（Map-Reduce 需要语言模型）。"
+            raise ValueError(msg)
+        if mode == "Local Search" and self.embedding_model is None:
+            msg = "Local Search 必须连接 Embedding 模型（实体描述向量检索）。"
+            raise ValueError(msg)
 
-        edge_definition = (self.edge_definition or "").strip() or kb.edge_definition
-        kwargs = self.strategy_kwargs or {}
-        docs = retrieve_documents(
+        docs, text, meta = retrieve_documents(
             kb,
             self.search_query,
             embedding=self.embedding_model,
-            edge_definition=edge_definition,
-            strategy=self.strategy or "Eager",
-            strategy_kwargs=kwargs if isinstance(kwargs, dict) else {},
-            top_k=int(self.top_k or 4),
-            depth=int(self.depth or 1),
+            llm=self.llm,
+            search_mode=mode,
+            community_level=int(self.community_level or 0),
+            top_k_entities=int(self.top_k_entities or 8),
+            top_k_chunks=int(self.top_k_chunks or 6),
+            answer_with_llm=bool(self.answer_with_llm),
+            dynamic_community_selection=bool(self.dynamic_community_selection),
         )
         self._last_docs = docs
-        if not docs:
-            self.status = "未检索到结果。请确认已入库建图，且边字段（如 entities）非空。"
-        else:
-            self.status = f"检索到 {len(docs)} 条结果。"
-        return docs
+        self._last_text = text
+        self._last_meta = meta
+        self.status = f"{meta.get('mode')} 完成：文档/报告 {len(docs)} 条。"
+        self.log(str(meta))
+        return docs, text, meta
 
     def search(self) -> list[Data]:
-        return docs_to_data(self._search_docs())
+        docs, _, _ = self._run()
+        return docs_to_data(docs)
 
     def search_context(self) -> Data:
-        docs = self._last_docs if self._last_docs is not None else self._search_docs()
-        if not docs:
-            text = "（无检索结果。请先完成入库建图，或更换检索问题/边定义。）"
-            return Data(text=text, data={"results": [], "message": text})
-        parts = []
-        for i, doc in enumerate(docs, start=1):
-            parts.append(f"[{i}] {doc.page_content}")
-        text = "\n\n".join(parts)
-        return Data(text=text, data={"count": len(docs)})
+        if self._last_text is None:
+            _, text, meta = self._run()
+        else:
+            text, meta = self._last_text, self._last_meta or {}
+        return Data(text=text or "", data=meta or {})

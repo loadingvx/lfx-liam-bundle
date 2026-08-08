@@ -15,14 +15,41 @@ build/
 dist/
 *.egg-info/
 .wheels/
+*.whl
 
 # Editor / OS
 .idea/
 .vscode/
+*.swp
 .DS_Store
+Thumbs.db
 
-# Test / coverage
+# Test / coverage / lint
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .ruff_cache/
+.mypy_cache/
+coverage.xml
+.tox/
+.nox/
+
+# Packaging / tools
+.uv/
+uv-cache/
+.cache/
+.pre-commit-cache/
+
+# Secrets / local overrides（永远不要提交）
+.env
+.env.*
+!.env.example
+*.pem
+credentials.json
+secrets/
+
+# Misc
+*.log
+tmp/
+.temp/

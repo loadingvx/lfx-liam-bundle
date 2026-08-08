@@ -1,12 +1,36 @@
 [project]
 name = "lfx-liam-bundle"
-version = "0.2.0"
-description = "Liam GraphRAG 知识库建库与检索组件（AstraDB / ArangoDB）。"
+version = "0.3.1"
+description = "Liam 完整 GraphRAG：实体关系抽取、Gleaning、分层社区、Local/Global Search（AstraDB / ArangoDB）。"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
 license = { text = "MIT" }
 authors = [{ name = "Liam" }]
-keywords = ["langflow", "lfx", "extension", "bundle", "liam"]
+maintainers = [{ name = "Liam" }]
+keywords = [
+    "langflow",
+    "lfx",
+    "extension",
+    "bundle",
+    "liam",
+    "graphrag",
+    "knowledge-graph",
+    "astradb",
+    "arangodb",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Typing :: Typed",
+]
 dependencies = [
     # 运行时由 Langflow 环境提供 lfx；此处声明兼容范围，便于本地开发解析。
     "lfx>=1.11.0,<2.0.0",
@@ -16,10 +40,16 @@ dependencies = [
     "graph-retriever==0.8.0",
     "python-arango>=8.0.0,<9.0.0",
     "langchain-core>=0.3.0",
+    "networkx>=3.2",
 ]
 
 [project.urls]
-Documentation = "https://docs.langflow.org/extensions-quickstart"
+Homepage = "https://github.com/loadingvx/lfx-liam-bundle"
+Documentation = "https://github.com/loadingvx/lfx-liam-bundle#readme"
+Repository = "https://github.com/loadingvx/lfx-liam-bundle"
+Issues = "https://github.com/loadingvx/lfx-liam-bundle/issues"
+Changelog = "https://github.com/loadingvx/lfx-liam-bundle/blob/main/CHANGELOG.md"
+"Langflow Extensions" = "https://docs.langflow.org/extensions-quickstart"
 
 [project.entry-points."langflow.extensions"]
 lfx-liam-bundle = "lfx_liam_bundle"
@@ -34,6 +64,7 @@ include = [
     "src/lfx_liam_bundle/extension.json",
     "src/lfx_liam_bundle/components/**/*.py",
     "src/lfx_liam_bundle/graphrag/**/*.py",
+    "src/lfx_liam_bundle/py.typed",
 ]
 
 [tool.hatch.build.targets.sdist]
@@ -41,8 +72,11 @@ include = [
     "src/lfx_liam_bundle",
     "extension.json",
     "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
     "pyproject.toml",
     "tests",
+    "docs",
 ]
 
 [tool.uv]
@@ -55,12 +89,57 @@ lfx = { path = "../langflow/src/lfx", editable = true }
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
     "build>=1.2.0",
+    "ruff>=0.9.0",
+    "pre-commit>=4.0.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+addopts = ["-q", "--strict-markers"]
+
+[tool.coverage.run]
+source = ["lfx_liam_bundle"]
+branch = true
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+fail_under = 0
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # bugbear
+    "SIM", # simplify
+    "RUF", # ruff-specific
+]
+ignore = [
+    "E501",   # 组件中文文案较长，由阅读性优先
+    "RUF001", # 中文全角标点（字符串）属预期
+    "RUF002", # 中文全角标点（docstring）属预期
+    "RUF003", # 中文全角标点（注释）属预期
+    "RUF012", # Langflow Component 的 inputs/outputs 类属性惯用可变默认
+    "SIM105", # 存储适配器中 try/except/pass 清理失败可接受
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["lfx_liam_bundle"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
 
 [tool.langflow.extension]
 manifest = "extension.json"

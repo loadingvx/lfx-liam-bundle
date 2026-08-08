@@ -44,7 +44,9 @@ run_uv sync --group dev
 
 echo
 echo "环境就绪。"
-echo "  校验:   MISE_TRUSTED_CONFIG_PATHS=$ROOT/mise.toml mise exec -- uv run lfx extension validate ."
-echo "  测试:   mise exec -- uv run pytest   （或: uv run pytest）"
-echo "  本地dev: uv run lfx extension dev ."
-echo "  装入docker: ./scripts/deploy-to-docker.sh"
+echo "  一键门禁: make check"
+echo "  校验:     mise exec -- uv run lfx extension validate ."
+echo "  测试:     mise exec -- uv run pytest"
+echo "  本地dev:  mise exec -- uv run lfx extension dev ."
+echo "  装入docker: ./scripts/deploy-to-docker.sh  或  make deploy-docker"
+echo "  贡献指南: CONTRIBUTING.md"

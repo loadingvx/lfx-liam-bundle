@@ -5,8 +5,13 @@ from __future__ import annotations
 from lfx.custom.custom_component.component import Component
 from lfx.io import BoolInput, DropdownInput, MessageTextInput, Output, SecretStrInput, StrInput
 from lfx.schema.data import Data
-from lfx_liam_bundle.graphrag import arango_adapter, astra_adapter
-from lfx_liam_bundle.graphrag.types import DEFAULT_EDGE_DEFINITION, DEFAULT_EDGE_FIELDS, GraphRAGKnowledgeBase
+
+from lfx_liam_bundle.graphrag.kg_store import ensure_kg_schema
+from lfx_liam_bundle.graphrag.types import (
+    DEFAULT_EDGE_DEFINITION,
+    DEFAULT_EDGE_FIELDS,
+    GraphRAGKnowledgeBase,
+)
 
 
 class GraphRAGKBInstanceComponent(Component):
@@ -33,9 +38,13 @@ class GraphRAGKBInstanceComponent(Component):
         ),
         StrInput(
             name="collection_name",
-            display_name="集合/表名",
-            value="liam_graphrag_chunks",
-            info="Astra Collection 或 Arango 文档集合名。",
+            display_name="知识库前缀名",
+            value="liam_graphrag",
+            info=(
+                "存储前缀，系统会自动创建 "
+                "`{前缀}_chunks/_entities/_relationships/_communities/_reports` 等集合。"
+                "不要手动加 `_chunks` 后缀。"
+            ),
             required=True,
         ),
         BoolInput(
@@ -46,9 +55,9 @@ class GraphRAGKBInstanceComponent(Component):
         ),
         StrInput(
             name="edge_definition",
-            display_name="默认边定义",
+            display_name="兼容边定义（遗留）",
             value=DEFAULT_EDGE_DEFINITION,
-            info="与检索组件默认一致，例如 entities,entities",
+            info="完整 GraphRAG 使用实体关系图与社区报告；此字段仅保留兼容，可忽略。",
             advanced=True,
         ),
         # Astra
@@ -121,13 +130,32 @@ class GraphRAGKBInstanceComponent(Component):
             graph_name=(self.graph_name or "").strip(),
         )
         try:
-            if kb.backend == "astradb":
-                kb = astra_adapter.connect_and_probe(kb, create_if_missing=bool(self.create_if_missing))
-            else:
-                kb = arango_adapter.connect_and_probe(kb, create_if_missing=bool(self.create_if_missing))
-        except Exception as e:  # noqa: BLE001
+            ensure_kg_schema(kb, create_if_missing=bool(self.create_if_missing))
+            # 探测 chunks 是否已有数据
+            from lfx_liam_bundle.graphrag.kg_store import load_index
+
+            try:
+                index = load_index(kb)
+                kb.document_count = len(index.text_units)
+                if index.entities or index.text_units:
+                    kb.status = "ready"
+                    kb.message = (
+                        f"已连接 GraphRAG 知识库「{kb.name}」[{kb.backend}]："
+                        f"文本单元 {len(index.text_units)}，实体 {len(index.entities)}，"
+                        f"关系 {len(index.relationships)}，社区 {len(index.communities)}，"
+                        f"报告 {len(index.community_reports)}。"
+                    )
+                else:
+                    kb.status = "empty"
+                    kb.message = (
+                        f"已连接 GraphRAG 知识库「{kb.name}」，尚未建图，请运行「入库建图」。"
+                    )
+            except Exception:
+                kb.status = "empty"
+                kb.message = f"已初始化 GraphRAG 存储骨架「{kb.collection_name}」，可开始入库建图。"
+        except Exception as e:
             kb.status = "error"
-            kb.message = str(e)
+            kb.message = f"连接 GraphRAG 知识库失败：{e}"
             self.status = kb.message
             raise ValueError(kb.message) from e
 

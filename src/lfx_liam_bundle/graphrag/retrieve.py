@@ -1,27 +1,17 @@
-"""统一 GraphRAG 检索入口。"""
+"""统一检索入口：Local Search / Global Search。"""
 
 from __future__ import annotations
 
-import inspect
-from abc import ABC
 from typing import Any
 
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
-from lfx_liam_bundle.graphrag import arango_adapter, astra_adapter
-from lfx_liam_bundle.graphrag.edges import evaluate_edge_definition, parse_edge_definition
+from lfx_liam_bundle.graphrag.global_search import global_search
+from lfx_liam_bundle.graphrag.local_search import local_search
 from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
-
-def traversal_strategy_names() -> list[str]:
-    try:
-        import graph_retriever.strategies as strategies_module
-    except ImportError:
-        return ["Eager"]
-    classes = inspect.getmembers(strategies_module, inspect.isclass)
-    names = [name for name, cls in classes if ABC not in cls.__bases__]
-    return names or ["Eager"]
+SEARCH_MODES = ["Local Search", "Global Search"]
 
 
 def retrieve_documents(
@@ -29,12 +19,14 @@ def retrieve_documents(
     query: str,
     *,
     embedding: Embeddings | None = None,
-    edge_definition: str | None = None,
-    strategy: str = "Eager",
-    strategy_kwargs: dict[str, Any] | None = None,
-    top_k: int = 4,
-    depth: int = 1,
-) -> list[Document]:
+    llm: Any | None = None,
+    search_mode: str = "Local Search",
+    community_level: int = 0,
+    top_k_entities: int = 8,
+    top_k_chunks: int = 6,
+    answer_with_llm: bool = True,
+    dynamic_community_selection: bool = False,
+) -> tuple[list[Document], str, dict[str, Any]]:
     if not (query or "").strip():
         msg = "检索问题不能为空。"
         raise ValueError(msg)
@@ -42,57 +34,32 @@ def retrieve_documents(
         msg = f"知识库状态异常：{kb.message}"
         raise ValueError(msg)
 
-    edge_def = edge_definition or kb.edge_definition
-    if kb.backend == "astradb":
-        return _retrieve_astra(
+    mode = (search_mode or "Local Search").strip()
+    if mode == "Global Search":
+        return global_search(
             kb,
             query,
-            embedding=embedding,
-            edge_definition=edge_def,
-            strategy=strategy,
-            strategy_kwargs=strategy_kwargs or {},
+            llm,
+            community_level=community_level,
+            dynamic_community_selection=dynamic_community_selection,
         )
-    if kb.backend == "arangodb":
-        source_field, _ = parse_edge_definition(edge_def)
-        return arango_adapter.retrieve(
+    if mode == "Local Search":
+        if embedding is None:
+            msg = "Local Search 需要 Embedding 模型（实体描述向量检索）。请连接 Embedding。"
+            raise ValueError(msg)
+        return local_search(
             kb,
             query,
             embedding,
-            top_k=top_k,
-            depth=depth,
-            edge_field=source_field,
+            llm=llm,
+            top_k_entities=top_k_entities,
+            top_k_chunks=top_k_chunks,
+            answer_with_llm=answer_with_llm,
         )
-    msg = f"不支持的后端：{kb.backend}"
+    msg = f"不支持的检索模式：{mode}。请选择 Local Search 或 Global Search。"
     raise ValueError(msg)
 
 
-def _retrieve_astra(
-    kb: GraphRAGKnowledgeBase,
-    query: str,
-    *,
-    embedding: Embeddings | None,
-    edge_definition: str,
-    strategy: str,
-    strategy_kwargs: dict[str, Any],
-) -> list[Document]:
-    try:
-        import graph_retriever.strategies as strategies_module
-        from langchain_graph_retriever import GraphRetriever
-    except ImportError as e:
-        msg = (
-            "缺少 GraphRetriever 依赖。请安装：pip install langchain-graph-retriever graph-retriever "
-            f"（原始错误：{e}）"
-        )
-        raise ImportError(msg) from e
-
-    store = astra_adapter.build_vector_store(kb, embedding)
-    if not hasattr(strategies_module, strategy):
-        msg = f"未知遍历策略「{strategy}」。可选：{', '.join(traversal_strategy_names())}"
-        raise ValueError(msg)
-    strategy_class = getattr(strategies_module, strategy)
-    retriever = GraphRetriever(
-        store=store,
-        edges=[evaluate_edge_definition(edge_definition)],
-        strategy=strategy_class(**strategy_kwargs),
-    )
-    return list(retriever.invoke(query))
+def traversal_strategy_names() -> list[str]:
+    """兼容旧测试/字段：现为检索模式列表。"""
+    return list(SEARCH_MODES)

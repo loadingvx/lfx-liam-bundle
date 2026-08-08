@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import math
 from typing import Any
 
@@ -55,7 +56,9 @@ def _edge_collection(kb: GraphRAGKnowledgeBase) -> str:
     return f"{_chunk_collection(kb)}_links"
 
 
-def ensure_schema(kb: GraphRAGKnowledgeBase, *, create_if_missing: bool = True) -> GraphRAGKnowledgeBase:
+def ensure_schema(
+    kb: GraphRAGKnowledgeBase, *, create_if_missing: bool = True
+) -> GraphRAGKnowledgeBase:
     db = _db(kb)
     chunk_col = _chunk_collection(kb)
     entity_col = _entity_collection(kb)
@@ -88,16 +91,20 @@ def ensure_schema(kb: GraphRAGKnowledgeBase, *, create_if_missing: bool = True) 
         count = db.collection(chunk_col).count()
         kb.document_count = int(count or 0)
         kb.status = "ready" if kb.document_count > 0 else "empty"
-        kb.message = f"已连接 ArangoDB「{kb.arango_database}/{chunk_col}」，文档数={kb.document_count}。"
+        kb.message = (
+            f"已连接 ArangoDB「{kb.arango_database}/{chunk_col}」，文档数={kb.document_count}。"
+        )
     except ValueError:
         raise
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         msg = f"连接或初始化 ArangoDB 失败：{e}"
         raise ValueError(msg) from e
     return kb
 
 
-def connect_and_probe(kb: GraphRAGKnowledgeBase, *, create_if_missing: bool = True) -> GraphRAGKnowledgeBase:
+def connect_and_probe(
+    kb: GraphRAGKnowledgeBase, *, create_if_missing: bool = True
+) -> GraphRAGKnowledgeBase:
     return ensure_schema(kb, create_if_missing=create_if_missing)
 
 
@@ -147,7 +154,7 @@ def ingest_documents(
         if mode == "按文档ID覆盖" and chunk_col.has(key):
             chunk_col.delete(key)
             # 清理旧边（忽略失败）
-            try:
+            with contextlib.suppress(Exception):
                 db.aql.execute(
                     "FOR e IN @@edge FILTER e._from == @from OR e._to == @to REMOVE e IN @@edge",
                     bind_vars={
@@ -156,8 +163,6 @@ def ingest_documents(
                         "to": f"{_chunk_collection(kb)}/{key}",
                     },
                 )
-            except Exception:  # noqa: BLE001
-                pass
         chunk_col.insert(body, overwrite=True, overwrite_mode="replace")
         ingested += 1
 
@@ -182,7 +187,13 @@ def ingest_documents(
     kb.document_count = int(chunk_col.count() or 0)
     kb.status = "ready"
     kb.message = f"已入库 {ingested} 条文档到 ArangoDB「{_chunk_collection(kb)}」。"
-    return kb, {"ingested": ingested, "skipped": 0, "mode": mode, "backend": "arangodb", "message": kb.message}
+    return kb, {
+        "ingested": ingested,
+        "skipped": 0,
+        "mode": mode,
+        "backend": "arangodb",
+        "message": kb.message,
+    }
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -276,7 +287,7 @@ def retrieve(
                     for doc in neigh:
                         if doc and doc.get("_id") not in selected:
                             selected[doc["_id"]] = {**doc, "_score": 0.0}
-            except Exception:  # noqa: BLE001
+            except Exception:
                 # 无图或图查询失败时退回纯向量结果
                 break
 

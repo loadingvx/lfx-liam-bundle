@@ -1,19 +1,22 @@
-"""建库侧：文档入库 + 向量索引 + 图边创建。"""
+"""建库侧：完整 GraphRAG 索引流水线（抽取+Gleaning+分层社区+报告+向量化）。"""
 
 from __future__ import annotations
 
 from lfx.custom.custom_component.component import Component
-from lfx.io import DropdownInput, HandleInput, Output, StrInput
+from lfx.io import BoolInput, DropdownInput, HandleInput, IntInput, Output, StrInput
 from lfx.schema.data import Data
-from lfx_liam_bundle.graphrag import arango_adapter, astra_adapter
-from lfx_liam_bundle.graphrag.edges import coerce_documents
-from lfx_liam_bundle.graphrag.entity_extract import enrich_documents_for_graph
+
+from lfx_liam_bundle.graphrag.extract_graph import DEFAULT_ENTITY_TYPES
+from lfx_liam_bundle.graphrag.pipeline import run_indexing_pipeline
 from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
 
 class GraphRAGKBBuildComponent(Component):
     display_name = "GraphRAG 入库建图"
-    description = "向知识库实例写入文档、构建向量索引并生成图边（一次完成建库侧全流程）。"
+    description = (
+        "完整 GraphRAG 建库：TextUnit→实体/关系抽取（含 Data Gleaning）→"
+        "分层社区检测→社区报告→向量索引落库。"
+    )
     name = "LiamGraphRAGBuild"
     icon = "DatabaseZap"
 
@@ -30,49 +33,69 @@ class GraphRAGKBBuildComponent(Component):
             display_name="待入库文档",
             input_types=["Data", "DataFrame", "Table"],
             is_list=True,
-            info="文档或文本块列表。",
+            info="文档或文本块（TextUnit）列表。建议先切分再入库。",
             required=True,
         ),
         HandleInput(
             name="embedding_model",
             display_name="Embedding 模型",
             input_types=["Embeddings"],
-            info="用于生成向量索引。",
+            info="用于 TextUnit / 实体描述 / 社区报告向量化（Local Search 依赖）。",
             required=True,
+        ),
+        HandleInput(
+            name="llm",
+            display_name="语言模型 LLM",
+            input_types=["LanguageModel"],
+            info="必须连接：实体关系抽取、Data Gleaning、社区报告均依赖 LLM。",
+            required=True,
+        ),
+        IntInput(
+            name="max_gleanings",
+            display_name="Gleaning 轮数",
+            value=1,
+            info="Data Gleaning 补抽轮数（对齐微软 GraphRAG）。建议 1~2；0 表示关闭补抽。",
+        ),
+        BoolInput(
+            name="extract_claims",
+            display_name="抽取事实声明 Claims",
+            value=False,
+            advanced=True,
+            info="可选（微软默认关闭）。开启后额外抽取 Covariates，供 Local Search 使用，费用更高。",
+        ),
+        IntInput(
+            name="max_cluster_size",
+            display_name="社区最大规模",
+            value=10,
+            advanced=True,
+            info="分层社区递归分裂阈值（实体数）。",
+        ),
+        IntInput(
+            name="max_community_levels",
+            display_name="社区最大层数",
+            value=3,
+            advanced=True,
+            info="社区层次深度。层数越多，Global Search 粒度越细。",
+        ),
+        StrInput(
+            name="entity_types",
+            display_name="实体类型",
+            value="、".join(DEFAULT_ENTITY_TYPES),
+            advanced=True,
+            info="逗号/顿号分隔的实体类型约束。",
         ),
         DropdownInput(
             name="write_mode",
             display_name="写入模式",
-            options=["按文档ID覆盖", "追加"],
-            value="按文档ID覆盖",
-            info="覆盖模式会先按 doc_id 删除再写入，适合重复导入。",
-        ),
-        DropdownInput(
-            name="graph_mode",
-            display_name="建图模式",
-            options=["仅用已有metadata边", "LLM抽取实体写入边"],
-            value="仅用已有metadata边",
-            info="若选择 LLM 抽取，请连接下方语言模型。",
-        ),
-        HandleInput(
-            name="llm",
-            display_name="实体抽取 LLM（可选）",
-            input_types=["LanguageModel"],
-            required=False,
-            info="建图模式为 LLM 抽取时使用。",
-        ),
-        StrInput(
-            name="edge_definition",
-            display_name="边定义（可选覆盖）",
-            value="",
-            advanced=True,
-            info="留空则使用知识库实例上的默认边定义。",
+            options=["重建索引", "追加合并"],
+            value="重建索引",
+            info="重建：清空后全量写入。追加：与已有实体/关系合并后重建社区与报告。",
         ),
     ]
 
     outputs = [
         Output(display_name="知识库实例", name="kb_instance_out", method="build_and_index"),
-        Output(display_name="入库汇总", name="summary", method="build_summary"),
+        Output(display_name="建库汇总", name="summary", method="build_summary"),
     ]
 
     _last_summary: dict | None = None
@@ -80,40 +103,26 @@ class GraphRAGKBBuildComponent(Component):
 
     def _run_build(self) -> GraphRAGKnowledgeBase:
         kb = GraphRAGKnowledgeBase.from_data(self.kb_instance)
-        documents = coerce_documents(self.ingest_data)
-        if not documents:
-            msg = "没有可入库的有效文档（文本为空）。请检查「待入库文档」输入。"
-            raise ValueError(msg)
-
-        if self.edge_definition and str(self.edge_definition).strip():
-            kb.edge_definition = str(self.edge_definition).strip()
-
-        graph_mode = self.graph_mode or "仅用已有metadata边"
-        if graph_mode == "LLM抽取实体写入边" and self.llm is None:
-            msg = "已选择「LLM抽取实体写入边」，但未连接语言模型。请连接 LLM，或改回「仅用已有metadata边」。"
-            raise ValueError(msg)
-
-        documents = enrich_documents_for_graph(
-            documents,
-            edge_fields=kb.edge_fields,
-            graph_mode=graph_mode,
-            llm=self.llm,
-        )
-
-        if kb.backend == "astradb":
-            kb, summary = astra_adapter.ingest_documents(
-                kb, documents, self.embedding_model, mode=self.write_mode or "按文档ID覆盖"
+        types_raw = (self.entity_types or "").replace("，", "、").replace(",", "、")
+        entity_types = [x.strip() for x in types_raw.split("、") if x.strip()]
+        replace = (self.write_mode or "重建索引") == "重建索引"
+        try:
+            kb, _index, summary = run_indexing_pipeline(
+                kb,
+                self.ingest_data,
+                llm=self.llm,
+                embedding=self.embedding_model,
+                max_gleanings=int(self.max_gleanings if self.max_gleanings is not None else 1),
+                max_cluster_size=int(self.max_cluster_size or 10),
+                max_community_levels=int(self.max_community_levels or 3),
+                entity_types=entity_types or None,
+                replace=replace,
+                extract_claims=bool(self.extract_claims),
             )
-        elif kb.backend == "arangodb":
-            kb, summary = arango_adapter.ingest_documents(
-                kb, documents, self.embedding_model, mode=self.write_mode or "按文档ID覆盖"
-            )
-        else:
-            msg = f"不支持的后端：{kb.backend}"
-            raise ValueError(msg)
+        except Exception as e:
+            msg = f"GraphRAG 建库失败：{e}"
+            raise ValueError(msg) from e
 
-        summary["graph_mode"] = graph_mode
-        summary["edge_definition"] = kb.edge_definition
         self._last_summary = summary
         self._last_kb = kb
         self.status = kb.message
@@ -127,5 +136,5 @@ class GraphRAGKBBuildComponent(Component):
         if self._last_summary is None:
             self._run_build()
         summary = self._last_summary or {}
-        text = summary.get("message") or "入库完成"
+        text = summary.get("message") or "建库完成"
         return Data(text=text, data=summary)

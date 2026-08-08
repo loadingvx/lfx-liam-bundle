@@ -1,0 +1,36 @@
+name: 功能请求
+description: 提议新功能或改进现有体验
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解决什么问题
+      description: 用中文描述当前痛点（谁、在什么场景卡住）
+      placeholder: 例如：清空集合前缺少二次确认，误操作成本高……
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望方案
+      description: 你希望怎么用；如有替代方案也可写上
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: 主要相关后端
+      options:
+        - AstraDB
+        - ArangoDB
+        - 两者 / 通用
+        - 与后端无关（文档/工程/CI）
+    validations:
+      required: true
+  - type: textarea
+    id: extras
+    attributes:
+      label: 补充信息
+      description: 截图、Flow 结构、相关 Issue 链接等（请脱敏）

@@ -1,0 +1,104 @@
+# 在 GitHub Release 发布后，构建并上传到 PyPI（Trusted Publishing / OIDC，无需 API Token）。
+# 文档: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
+#
+# 首次使用前请完成:
+# 1. GitHub 仓库 Settings → Environments → 新建环境 `pypi`（建议加 Required reviewers）
+# 2. PyPI → Account settings → Publishing → Add a new pending publisher:
+#      - PyPI Project Name: lfx-liam-bundle
+#      - Owner: loadingvx
+#      - Repository: lfx-liam-bundle
+#      - Workflow name: python-publish.yml
+#      - Environment name: pypi
+# 3. 发版前把下列位置的 version 改成与 tag 一致（tag 可为 v0.3.1 或 0.3.1）：
+#      - pyproject.toml → project.version
+#      - src/lfx_liam_bundle/__init__.py → __version__
+#      - extension.json 与 src/lfx_liam_bundle/extension.json → version
+
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  release-build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify version matches release tag
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          EXPECTED="${TAG#v}"
+
+          PROJECT_VERSION="$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' pyproject.toml | head -n1)"
+          INIT_VERSION="$(sed -nE 's/^__version__[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' src/lfx_liam_bundle/__init__.py | head -n1)"
+          ROOT_EXT_VERSION="$(sed -nE 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' extension.json | head -n1)"
+          PKG_EXT_VERSION="$(sed -nE 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' src/lfx_liam_bundle/extension.json | head -n1)"
+
+          echo "Release tag:     ${TAG}"
+          echo "期望版本:        ${EXPECTED}"
+          echo "pyproject:       ${PROJECT_VERSION}"
+          echo "__init__:        ${INIT_VERSION}"
+          echo "extension.json:  ${ROOT_EXT_VERSION}"
+          echo "pkg extension:   ${PKG_EXT_VERSION}"
+
+          if [ -z "${PROJECT_VERSION}" ] || [ -z "${INIT_VERSION}" ] || [ -z "${ROOT_EXT_VERSION}" ] || [ -z "${PKG_EXT_VERSION}" ]; then
+            echo "::error::未能解析版本号。请确认 pyproject.toml、src/lfx_liam_bundle/__init__.py、两份 extension.json 均含版本字段。"
+            exit 1
+          fi
+
+          if [ "${PROJECT_VERSION}" != "${EXPECTED}" ] \
+            || [ "${INIT_VERSION}" != "${EXPECTED}" ] \
+            || [ "${ROOT_EXT_VERSION}" != "${EXPECTED}" ] \
+            || [ "${PKG_EXT_VERSION}" != "${EXPECTED}" ]; then
+            echo "::error::版本不一致。请先把 pyproject.toml、src/lfx_liam_bundle/__init__.py、两份 extension.json 的版本改为 ${EXPECTED}，再创建同名 Release（tag 可用 v${EXPECTED}）。"
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+
+      - name: Build release distributions
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+          ls -lah dist/
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-dists
+          path: dist/
+
+  pypi-publish:
+    runs-on: ubuntu-latest
+    needs:
+      - release-build
+    permissions:
+      # Trusted Publishing (OIDC) 必需
+      id-token: write
+
+    environment:
+      name: pypi
+      url: https://pypi.org/p/lfx-liam-bundle
+
+    steps:
+      - name: Retrieve release distributions
+        uses: actions/download-artifact@v7
+        with:
+          name: release-dists
+          path: dist/
+
+      - name: Publish release distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          verbose: true
+          print-hash: true

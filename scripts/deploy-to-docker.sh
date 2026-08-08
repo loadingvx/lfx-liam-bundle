@@ -144,6 +144,7 @@ verify_extension
 echo
 echo "部署完成。"
 echo "  UI:        http://localhost:5173"
-echo "  查找位置:  Components（或搜索 Liam Hello）；未改 SIDEBAR_BUNDLES 时 Bundles 列表可能没有 Liam"
-echo "  组件名:    Liam Hello"
-echo "  若看不到:  硬刷新浏览器（Ctrl+Shift+R）"
+echo "  查找位置:  Components → 搜索 GraphRAG / Liam"
+echo "  组件:      GraphRAG 知识库 / 入库建图 / 检索 / 知识库维护"
+echo "  校验:      docker compose exec langflow uv run lfx extension list"
+echo "  若看不到:  硬刷新浏览器（Ctrl+Shift+R），并确认本脚本未报错"

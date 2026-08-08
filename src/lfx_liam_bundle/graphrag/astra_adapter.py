@@ -22,7 +22,9 @@ def _require_astra_deps() -> None:
         raise ImportError(msg) from e
 
 
-def connect_and_probe(kb: GraphRAGKnowledgeBase, *, create_if_missing: bool = True) -> GraphRAGKnowledgeBase:
+def connect_and_probe(
+    kb: GraphRAGKnowledgeBase, *, create_if_missing: bool = True
+) -> GraphRAGKnowledgeBase:
     _require_astra_deps()
     from astrapy import DataAPIClient
 
@@ -35,7 +37,9 @@ def connect_and_probe(kb: GraphRAGKnowledgeBase, *, create_if_missing: bool = Tr
 
     try:
         client = DataAPIClient(kb.token)
-        database = client.get_database(kb.api_endpoint, token=kb.token, keyspace=kb.keyspace or None)
+        database = client.get_database(
+            kb.api_endpoint, token=kb.token, keyspace=kb.keyspace or None
+        )
         names = list(database.list_collection_names())
         if kb.collection_name not in names:
             if not create_if_missing:
@@ -51,7 +55,7 @@ def connect_and_probe(kb: GraphRAGKnowledgeBase, *, create_if_missing: bool = Tr
                 # estimated count if available
                 count = collection.count_documents({}, upper_bound=1000)
                 kb.document_count = int(count) if isinstance(count, int) else 0
-            except Exception:  # noqa: BLE001
+            except Exception:
                 kb.document_count = 0
             kb.status = "ready" if kb.document_count > 0 else "empty"
             kb.message = (
@@ -59,7 +63,7 @@ def connect_and_probe(kb: GraphRAGKnowledgeBase, *, create_if_missing: bool = Tr
             )
     except ValueError:
         raise
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         msg = f"连接 AstraDB 失败：{e}"
         raise ValueError(msg) from e
     return kb
@@ -102,7 +106,7 @@ def ingest_documents(
         if ids:
             try:
                 store.delete(ids=ids)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 # 删除失败不阻断写入（可能文档尚不存在）
                 skipped = 0
 
@@ -120,7 +124,9 @@ def ingest_documents(
     return kb, summary
 
 
-def delete_by_ids(kb: GraphRAGKnowledgeBase, doc_ids: list[str], embedding: Embeddings | None) -> dict[str, Any]:
+def delete_by_ids(
+    kb: GraphRAGKnowledgeBase, doc_ids: list[str], embedding: Embeddings | None
+) -> dict[str, Any]:
     if not doc_ids:
         msg = "请提供要删除的文档 ID（doc_id）。"
         raise ValueError(msg)
@@ -153,5 +159,5 @@ def count_documents(kb: GraphRAGKnowledgeBase) -> int:
     collection = database.get_collection(kb.collection_name)
     try:
         return int(collection.count_documents({}, upper_bound=100000))
-    except Exception:  # noqa: BLE001
+    except Exception:
         return kb.document_count

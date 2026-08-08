@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 from langchain_core.documents import Document
-
 from lfx.schema.data import Data
+
 from lfx_liam_bundle.graphrag.edges import (
     coerce_documents,
     normalize_edge_metadata,
@@ -34,7 +34,9 @@ def test_kb_roundtrip_data() -> None:
     assert restored.name == "demo"
     assert restored.backend == "astradb"
     assert restored.document_count == 3
-    assert "token" not in restored.public_summary() or restored.public_summary().get("token") is None
+    assert (
+        "token" not in restored.public_summary() or restored.public_summary().get("token") is None
+    )
 
 
 def test_from_data_rejects_plain_data() -> None:
@@ -49,7 +51,9 @@ def test_parse_edge_definition() -> None:
 
 
 def test_normalize_and_coerce() -> None:
-    meta = normalize_edge_metadata({"entities": "A, B; A", "keywords": ["x", "x"]}, ["entities", "keywords"])
+    meta = normalize_edge_metadata(
+        {"entities": "A, B; A", "keywords": ["x", "x"]}, ["entities", "keywords"]
+    )
     assert meta["entities"] == ["A", "B"]
     assert meta["keywords"] == ["x"]
 

@@ -1,17 +1,18 @@
-"""知识库维护：统计 / 按 ID 删除 / 清空。"""
+"""知识库维护：统计 / 清空（完整 GraphRAG 表）。"""
 
 from __future__ import annotations
 
 from lfx.custom.custom_component.component import Component
-from lfx.io import DropdownInput, HandleInput, MessageTextInput, Output, StrInput
+from lfx.io import DropdownInput, HandleInput, Output, StrInput
 from lfx.schema.data import Data
-from lfx_liam_bundle.graphrag import arango_adapter, astra_adapter
+
+from lfx_liam_bundle.graphrag.kg_store import clear_index, load_index
 from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
 
 class GraphRAGKBMaintainComponent(Component):
     display_name = "GraphRAG 知识库维护"
-    description = "对知识库实例执行统计、按文档 ID 删除或清空（危险操作需确认）。"
+    description = "统计 GraphRAG 知识模型规模，或清空（危险操作需确认）。"
     name = "LiamGraphRAGMaintain"
     icon = "Trash2"
 
@@ -25,27 +26,14 @@ class GraphRAGKBMaintainComponent(Component):
         DropdownInput(
             name="operation",
             display_name="操作",
-            options=["统计", "按文档ID删除", "清空知识库"],
+            options=["统计", "清空知识库"],
             value="统计",
-        ),
-        MessageTextInput(
-            name="doc_ids",
-            display_name="文档 ID 列表",
-            info="按文档ID删除时使用，多个 ID 用逗号分隔。",
-            tool_mode=True,
         ),
         StrInput(
             name="confirm_text",
             display_name="清空确认语",
             value="",
-            info="清空知识库时必须输入：确认清空",
-            advanced=True,
-        ),
-        HandleInput(
-            name="embedding_model",
-            display_name="Embedding 模型（Astra 删除时可选）",
-            input_types=["Embeddings"],
-            required=False,
+            info="清空时必须输入：确认清空",
             advanced=True,
         ),
     ]
@@ -56,59 +44,31 @@ class GraphRAGKBMaintainComponent(Component):
     ]
 
     _last_result: dict | None = None
-    _last_kb: GraphRAGKnowledgeBase | None = None
 
     def _execute(self) -> GraphRAGKnowledgeBase:
         kb = GraphRAGKnowledgeBase.from_data(self.kb_instance)
         op = self.operation or "统计"
-        result: dict
-
         if op == "统计":
-            if kb.backend == "astradb":
-                count = astra_adapter.count_documents(kb)
-            else:
-                count = arango_adapter.count_documents(kb)
-            kb.document_count = count
-            kb.status = "ready" if count else "empty"
-            kb.message = f"知识库「{kb.name}」当前文档数：{count}。"
-            result = {"operation": op, "document_count": count, "message": kb.message}
-        elif op == "按文档ID删除":
-            raw = (self.doc_ids or "").strip()
-            ids = [x.strip() for x in raw.replace("\n", ",").split(",") if x.strip()]
-            if not ids:
-                msg = "请填写要删除的文档 ID（doc_id），多个用逗号分隔。"
-                raise ValueError(msg)
-            if kb.backend == "astradb":
-                result = astra_adapter.delete_by_ids(kb, ids, self.embedding_model)
-            else:
-                result = arango_adapter.delete_by_ids(kb, ids)
-            result["operation"] = op
-            try:
-                kb.document_count = (
-                    astra_adapter.count_documents(kb)
-                    if kb.backend == "astradb"
-                    else arango_adapter.count_documents(kb)
-                )
-            except Exception:  # noqa: BLE001
-                pass
-            kb.status = "ready" if kb.document_count else "empty"
+            index = load_index(kb)
+            stats = index.stats()
+            kb.document_count = stats["text_units"]
+            kb.status = "ready" if kb.document_count or stats["entities"] else "empty"
+            kb.message = (
+                f"统计：文本单元 {stats['text_units']}，实体 {stats['entities']}，"
+                f"关系 {stats['relationships']}，社区 {stats['communities']}（{stats['community_levels']} 层），"
+                f"报告 {stats['community_reports']}，声明 {stats.get('covariates', 0)}。"
+            )
+            result = {"operation": op, **stats, "message": kb.message}
         elif op == "清空知识库":
             if (self.confirm_text or "").strip() != "确认清空":
                 msg = "清空是危险操作。请在「清空确认语」中精确输入：确认清空"
                 raise ValueError(msg)
-            if kb.backend == "astradb":
-                result = astra_adapter.clear_collection(kb)
-            else:
-                result = arango_adapter.clear_collection(kb)
+            result = clear_index(kb)
             result["operation"] = op
-            kb.document_count = 0
-            kb.status = "empty"
         else:
             msg = f"未知操作：{op}"
             raise ValueError(msg)
-
         self._last_result = result
-        self._last_kb = kb
         self.status = result.get("message") or kb.message
         return kb
 

@@ -7,8 +7,8 @@ import re
 from typing import Any
 
 from langchain_core.documents import Document
-
 from lfx.schema.data import Data
+
 from lfx_liam_bundle.graphrag.types import DEFAULT_EDGE_DEFINITION
 
 
@@ -52,7 +52,9 @@ def _as_str_list(value: Any) -> list[str]:
     return [str(value).strip()] if str(value).strip() else []
 
 
-def normalize_edge_metadata(metadata: dict[str, Any] | None, edge_fields: list[str]) -> dict[str, Any]:
+def normalize_edge_metadata(
+    metadata: dict[str, Any] | None, edge_fields: list[str]
+) -> dict[str, Any]:
     meta = dict(metadata or {})
     for field in edge_fields:
         if field in meta:
@@ -69,14 +71,16 @@ def normalize_edge_metadata(metadata: dict[str, Any] | None, edge_fields: list[s
     return meta
 
 
-def stable_doc_id(text: str, metadata: dict[str, Any] | None = None, explicit_id: str | None = None) -> str:
+def stable_doc_id(
+    text: str, metadata: dict[str, Any] | None = None, explicit_id: str | None = None
+) -> str:
     if explicit_id:
         return str(explicit_id)
     meta = metadata or {}
     for key in ("doc_id", "id", "_id"):
         if meta.get(key):
             return str(meta[key])
-    digest = hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]  # noqa: S324
+    digest = hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
     return f"doc_{digest}"
 
 
@@ -115,7 +119,9 @@ def coerce_documents(ingest_data: Any) -> list[Document]:
             documents.append(Document(page_content=text, metadata={"doc_id": doc_id}, id=doc_id))
             continue
         if isinstance(item, dict):
-            text = str(item.get("text") or item.get("page_content") or item.get("content") or "").strip()
+            text = str(
+                item.get("text") or item.get("page_content") or item.get("content") or ""
+            ).strip()
             if not text:
                 continue
             meta = normalize_edge_metadata(item, ["entities", "keywords", "mentions"])
