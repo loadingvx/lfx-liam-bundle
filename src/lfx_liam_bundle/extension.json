@@ -1,0 +1,18 @@
+{
+  "$schema": "https://schemas.langflow.org/extension/v1.json",
+  "id": "lfx-liam-bundle",
+  "version": "0.2.0",
+  "name": "Liam Bundle",
+  "description": "Liam GraphRAG：知识库实例边界下的建库（入库/索引/建图）与检索全流程组件。",
+  "lfx": {
+    "compat": ["1"]
+  },
+  "bundles": [
+    {
+      "name": "liam",
+      "path": "components/liam",
+      "display_name": "Liam",
+      "icon": "Package"
+    }
+  ]
+}

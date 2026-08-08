@@ -1,0 +1,13 @@
+# mise 管理本工程的 Python / uv。用法示例：
+#   mise install
+#   mise exec -- uv sync --group dev
+#   mise exec -- uv run pytest
+#   mise exec -- uv run lfx extension validate .
+
+[tools]
+python = "3.13"
+uv = "latest"
+
+[env]
+# 让子进程默认使用本目录 .venv
+UV_PROJECT_ENVIRONMENT = "{{config_root}}/.venv"
