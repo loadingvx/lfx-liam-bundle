@@ -86,7 +86,7 @@ jobs:
           python -c "import sys; assert sys.version_info[:2] == (3, 10), sys.version"
 
       - name: Upload distributions
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: release-dists
           path: dist/
