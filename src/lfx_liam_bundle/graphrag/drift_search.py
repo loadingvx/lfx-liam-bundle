@@ -121,18 +121,18 @@ def drift_search(
     text_unit_prop: float = 0.5,
     community_prop: float = 0.25,
     conversation_history: str | None = None,
-    response_type: str = "多段落中文回答",
+    response_type: str = "Multi-paragraph answer",
 ) -> tuple[list[Document], str, dict[str, Any]]:
     if llm is None:
-        msg = "DRIFT Search 必须连接 LLM（Primer / Follow-Up / 汇总都需要）。"
+        msg = "DRIFT Search requires an LLM (Primer / Follow-Up / Reduce)."
         raise ValueError(msg)
     if embedding is None:
-        msg = "DRIFT Search 必须连接 Embedding（社区报告与 Local 入口）。"
+        msg = "DRIFT Search requires Embedding (community reports and Local entry)."
         raise ValueError(msg)
 
     index = load_index(kb)
     if not index.community_reports:
-        msg = "知识库中没有社区报告，无法 DRIFT Search。请先完成入库建图。"
+        msg = "No community reports; cannot run DRIFT Search. Index documents first."
         raise ValueError(msg)
 
     qvec = embedding.embed_query(query)
@@ -153,7 +153,7 @@ def drift_search(
         PRIMER_PROMPT.format(
             query=query,
             reports=_format_reports(primer_reports),
-            response_type=response_type or "多段落中文回答",
+            response_type=response_type or "Multi-paragraph answer",
             history_block=_history_block(conversation_history),
         ),
     )
@@ -164,7 +164,7 @@ def drift_search(
     except ValueError:
         # 模型未按 JSON 输出时降级：把原文当初步答案，并给默认追问，避免整条 DRIFT 失败
         primer = {
-            "answer": (primer_raw or "").strip() or "社区报告信息不足，将继续局部检索。",
+            "answer": (primer_raw or "").strip() or "Community reports are insufficient; continuing with local retrieval.",
             "confidence": 40,
             "follow_ups": [
                 {"question": query, "score": 80},
@@ -232,7 +232,7 @@ def drift_search(
                 text_unit_prop=text_unit_prop,
                 community_prop=community_prop,
                 conversation_history=conversation_history,
-                response_type="简洁中文要点",
+                response_type="Concise bullet points",
             )
             all_docs.extend(local_docs)
             refine_raw = invoke_llm(
@@ -302,7 +302,7 @@ def drift_search(
         REDUCE_PROMPT.format(
             query=query,
             hierarchy="\n\n---\n\n".join(hier_text_parts),
-            response_type=response_type or "多段落中文回答",
+            response_type=response_type or "Multi-paragraph answer",
             history_block=_history_block(conversation_history),
         ),
     )

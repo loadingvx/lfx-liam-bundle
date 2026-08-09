@@ -1,54 +1,52 @@
-# ArangoDB 环境与排障
+# ArangoDB setup and troubleshooting
 
-使用 **ArangoDB** 作为 GraphRAG 存储后端时阅读本文。
+Read this when using **ArangoDB** as the GraphRAG storage backend.
 
-## 服务器要求
+## Server requirements
 
-| 要求 | 说明 |
-|------|------|
-| 版本 | ≥ 3.12.4（建议 3.12.6+） |
-| 向量索引开关 | 3.12.4：`--experimental-vector-index true`；更高版本常见 `--vector-index` |
-| 网络 | Langflow 能访问组件里填写的 Arango URL |
-| 权限 | 账号可创建集合、图、索引 |
+| Requirement | Notes |
+|-------------|-------|
+| Version | ≥ 3.12.4 (prefer 3.12.6+) |
+| Vector index flag | 3.12.4: `--experimental-vector-index true`; newer builds often use `--vector-index` |
+| Network | Langflow must reach the Arango URL configured in the component |
+| Permissions | Account can create collections, graphs, and indexes |
 
-本地一键（可选）：
+Local one-shot (optional):
 
 ```bash
 ./devops/db-up.sh
-./devops/test-integration.sh
-./devops/db-down.sh
 ```
 
-## 本模块会创建什么
+## What this module creates
 
-以前缀 `{base}` 为例：
+With prefix `{base}`:
 
-- 文档集合：`{base}_chunks` / `_entities` / `_relationships` / `_communities` / `_reports` / `_covariates` / `_documents`  
-- 图：`{base}_kg_graph`，边集合 `{base}_entity_edges`  
-- 入库后（ANN 开启）为实体描述、原文、社区报告等字段建立向量索引  
+- Document collections: `{base}_chunks` / `_entities` / `_relationships` / `_communities` / `_reports` / `_covariates` / `_documents`  
+- Graph: `{base}_kg_graph`, edge collection `{base}_entity_edges`  
+- After indexing (ANN on): vector indexes on entity descriptions, text units, community reports, etc.
 
-小样本时会自动调整索引参数，降低部分版本上的稳定性风险。
+Small corpora auto-tune index parameters to reduce stability risk on some versions.
 
-## 现象与处理
+## Symptoms and fixes
 
-| 现象 | 常见原因 | 处理 |
-|------|----------|------|
-| 创建向量索引失败 | 未开向量开关或版本过旧 | 开启开关后覆盖重建 |
-| 近似检索失败 | 索引未建好 / 度量不一致 | ANN 开启后重建；度量先用 cosine |
-| 提示 ANN 失败将回退精确余弦 | 建索引失败但允许回退 | 先修服务器；急用可暂靠回退 |
-| 集合不存在 | 前缀/库名/账号不一致 | 与建库使用同一前缀与 database |
-| 向量维度不一致 | 检索 Embedding ≠ 建库模型 | 换回原模型或覆盖重建 |
-| 401 / 认证失败 | 用户名密码错 | 检查知识库组件凭证 |
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| Vector index create fails | Flag off or version too old | Enable flag, then rebuild |
+| Approximate search fails | Index missing / metric mismatch | Rebuild with ANN on; use cosine first |
+| ANN failed; falling back to exact cosine | Index failed but fallback allowed | Fix server; fallback is temporary |
+| Collection missing | Wrong prefix / DB / credentials | Match the KB component settings |
+| Embedding dimension mismatch | Retrieve Embedding ≠ indexing model | Restore original model or rebuild |
+| 401 / auth failure | Bad username/password | Fix credentials on Knowledge Base |
 
-## 最短自检
+## Quick self-check
 
-1. 从 Langflow 所在机器访问 Arango `_api/version`  
-2. 确认向量索引功能已开启  
-3. 知识库组件：地址/库/账号/前缀正确，ANN 开启  
-4. 开启向量功能后做一次覆盖重建  
-5. 检索结果 meta 中优先看到 ANN 与子图加载相关字段  
+1. From the Langflow host, hit Arango `_api/version`  
+2. Confirm vector-index support is enabled  
+3. Knowledge Base: URL / database / credentials / prefix correct; ANN on  
+4. Rebuild once after enabling vectors  
+5. Prefer seeing ANN / subgraph fields in retrieve meta  
 
-## 相关文档
+## Related
 
-- [知识库组件](../components/graphrag-kb.md)  
-- [最短 Flow](quickstart.md)
+- [Knowledge Base](../components/graphrag-kb.md)  
+- [Quickstart](quickstart.md)

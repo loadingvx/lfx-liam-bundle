@@ -222,8 +222,8 @@ def extract_graph_fast(
 
     if not entities:
         msg = (
-            "FastGraphRAG 未能抽取出实体。请确认文档含中文词组或英文专有名词，"
-            "或改用「标准 GraphRAG」建图模式。"
+            "FastGraphRAG extracted no entities. Confirm the documents contain "
+            "Chinese phrases or English proper nouns, or switch to Standard GraphRAG."
         )
         raise ValueError(msg)
 

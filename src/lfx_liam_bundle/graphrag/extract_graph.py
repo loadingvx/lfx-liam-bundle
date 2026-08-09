@@ -12,38 +12,46 @@ from typing import Any
 from lfx_liam_bundle.graphrag.llm_utils import invoke_llm, parse_json_payload
 from lfx_liam_bundle.graphrag.models import Entity, Relationship, TextUnit
 
-DEFAULT_ENTITY_TYPES = ["组织", "人物", "地点", "事件", "概念", "产品", "技术"]
+DEFAULT_ENTITY_TYPES = [
+    "Organization",
+    "Person",
+    "Location",
+    "Event",
+    "Concept",
+    "Product",
+    "Technology",
+]
 
-EXTRACT_PROMPT = """你是知识图谱抽取助手。从文本中抽取实体与关系。
-实体类型限定为：{entity_types}
+EXTRACT_PROMPT = """You are a knowledge-graph extraction assistant. Extract entities and relationships from the text.
+Allowed entity types: {entity_types}
 
-严格输出 JSON（不要 Markdown）：
+Return strict JSON only (no Markdown):
 {{
-  "entities": [{{"title": "实体名", "type": "类型", "description": "一句话描述"}}],
-  "relationships": [{{"source": "源实体名", "target": "目标实体名", "description": "关系描述", "weight": 1.0}}]
+  "entities": [{{"title": "name", "type": "type", "description": "one-sentence description"}}],
+  "relationships": [{{"source": "source name", "target": "target name", "description": "relationship", "weight": 1.0}}]
 }}
 
-文本：
+Text:
 {text}
 """
 
-GLEAN_PROMPT = """你之前已经从文本中抽取过一批实体与关系。请做 Data Gleaning：补抽遗漏的实体/关系。
-不要重复已有内容；若没有新发现，返回空数组。
+GLEAN_PROMPT = """You already extracted entities and relationships from the text. Perform Data Gleaning: add any missed entities/relationships.
+Do not repeat existing items; if nothing new is found, return empty arrays.
 
-已抽取实体：{entities}
-已抽取关系：{relationships}
+Already extracted entities: {entities}
+Already extracted relationships: {relationships}
 
-严格输出 JSON：
+Return strict JSON only:
 {{
-  "entities": [{{"title": "实体名", "type": "类型", "description": "一句话描述"}}],
-  "relationships": [{{"source": "源实体名", "target": "目标实体名", "description": "关系描述", "weight": 1.0}}]
+  "entities": [{{"title": "name", "type": "type", "description": "one-sentence description"}}],
+  "relationships": [{{"source": "source name", "target": "target name", "description": "relationship", "weight": 1.0}}]
 }}
 
-原文：
+Source text:
 {text}
 """
 
-SUMMARIZE_PROMPT = """请将下列关于同一实体/关系的多条描述合并为一条简洁中文描述（不超过80字），只输出描述文本本身：
+SUMMARIZE_PROMPT = """Merge the following descriptions of the same entity/relationship into one concise description (max ~80 words). Output the description text only:
 {descriptions}
 """
 

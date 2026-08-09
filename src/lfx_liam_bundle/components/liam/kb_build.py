@@ -1,4 +1,4 @@
-"""建库侧：完整 GraphRAG 索引流水线。"""
+"""Build side: full GraphRAG indexing pipeline."""
 
 from __future__ import annotations
 
@@ -13,10 +13,11 @@ from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
 
 class GraphRAGKBBuildComponent(Component):
-    display_name = "GraphRAG 入库建图"
+    display_name = "GraphRAG Index Builder"
     description = (
-        "GraphRAG 建库：标准（LLM 抽取+Gleaning）或 FastGraphRAG（NLP 名词短语+共现，更便宜）。"
-        "随后 Leiden 社区→社区报告→向量落库+ANN 索引。"
+        "Index documents into GraphRAG: Standard (LLM extract + gleaning) or "
+        "FastGraphRAG (NLP noun phrases + co-occurrence, cheaper). "
+        "Then Leiden communities → community reports → embeddings + ANN indexes."
     )
     name = "LiamGraphRAGBuild"
     icon = "DatabaseZap"
@@ -24,101 +25,102 @@ class GraphRAGKBBuildComponent(Component):
     inputs = [
         HandleInput(
             name="kb_instance",
-            display_name="知识库实例",
+            display_name="KB instance",
             input_types=["Data"],
-            info="连接「GraphRAG 知识库」组件的输出。",
+            info="Connect the output of GraphRAG Knowledge Base.",
             required=True,
         ),
         HandleInput(
             name="ingest_data",
-            display_name="待入库文档",
+            display_name="Documents to index",
             input_types=["Data", "DataFrame", "Table"],
             is_list=True,
-            info="原始文档或已切分文本。默认会按 token 再切成 TextUnit（可关闭）。",
+            info="Raw or pre-split text. By default each item is token-chunked into TextUnits (can disable).",
             required=True,
         ),
         HandleInput(
             name="embedding_model",
-            display_name="Embedding 模型",
+            display_name="Embedding model",
             input_types=["Embeddings"],
             required=True,
         ),
         HandleInput(
             name="llm",
-            display_name="语言模型 LLM",
+            display_name="Language model (LLM)",
             input_types=["LanguageModel"],
-            info="标准模式：抽取+报告。FastGraphRAG：仅社区报告需要 LLM。",
+            info="Standard: extract + reports. FastGraphRAG: LLM still needed for community reports.",
             required=True,
         ),
         DropdownInput(
             name="indexing_method",
-            display_name="建图模式",
-            options=["标准 GraphRAG", "FastGraphRAG"],
-            value="标准 GraphRAG",
+            display_name="Indexing method",
+            options=["Standard GraphRAG", "FastGraphRAG"],
+            value="Standard GraphRAG",
             info=(
-                "标准：LLM 实体/关系+Gleaning（质量高、更贵）。"
-                "FastGraphRAG：NLP 名词短语+共现关系（更快更便宜，图更噪，适合偏 Global 摘要）。"
+                "Standard: LLM entities/relationships + gleaning (higher quality, costlier). "
+                "FastGraphRAG: NLP noun phrases + co-occurrence (faster/cheaper, noisier; good for Global summaries)."
             ),
         ),
         BoolInput(
             name="chunk_enabled",
-            display_name="启用内置 token 切块",
+            display_name="Enable built-in token chunking",
             value=True,
-            info="对齐微软 Phase 1。关闭则把每条输入当作一个 TextUnit。",
+            info="Aligned with Microsoft Phase 1. If off, each input item becomes one TextUnit.",
         ),
         IntInput(
             name="chunk_size",
-            display_name="切块大小（tokens）",
+            display_name="Chunk size (tokens)",
             value=DEFAULT_CHUNK_SIZE,
             advanced=True,
-            info="默认 1200（微软默认同量级）。",
+            info="Default 1200 (same order as Microsoft defaults).",
         ),
         IntInput(
             name="chunk_overlap",
-            display_name="切块重叠（tokens）",
+            display_name="Chunk overlap (tokens)",
             value=DEFAULT_CHUNK_OVERLAP,
             advanced=True,
         ),
         IntInput(
             name="max_gleanings",
-            display_name="Gleaning 轮数",
+            display_name="Gleaning rounds",
             value=1,
         ),
         BoolInput(
             name="extract_claims",
-            display_name="抽取事实声明 Claims",
+            display_name="Extract claims",
             value=False,
             advanced=True,
         ),
         IntInput(
             name="max_cluster_size",
-            display_name="社区最大规模",
+            display_name="Max community size",
             value=10,
             advanced=True,
         ),
         IntInput(
             name="max_community_levels",
-            display_name="社区最大层数",
+            display_name="Max community levels",
             value=3,
             advanced=True,
         ),
         StrInput(
             name="entity_types",
-            display_name="实体类型",
-            value="、".join(DEFAULT_ENTITY_TYPES),
+            display_name="Entity types",
+            value=", ".join(DEFAULT_ENTITY_TYPES),
             advanced=True,
+            info="Comma-separated types for Standard extract.",
         ),
         DropdownInput(
             name="write_mode",
-            display_name="写入模式",
-            options=["重建索引", "追加合并"],
-            value="重建索引",
+            display_name="Write mode",
+            options=["Rebuild index", "Append merge"],
+            value="Rebuild index",
         ),
     ]
 
     outputs = [
-        Output(display_name="知识库实例", name="kb_instance_out", method="build_and_index"),
-        Output(display_name="建库汇总", name="summary", method="build_summary"),
+        Output(display_name="KB instance", name="kb_instance_out", method="build_and_index"),
+        Output(display_name="Build summary", name="summary", method="build_summary"),
     ]
 
     _last_summary: dict | None = None
@@ -126,12 +128,14 @@ class GraphRAGKBBuildComponent(Component):
 
     def _run_build(self) -> GraphRAGKnowledgeBase:
         kb = GraphRAGKnowledgeBase.from_data(self.kb_instance)
-        types_raw = (self.entity_types or "").replace("，", "、").replace(",", "、")
-        entity_types = [x.strip() for x in types_raw.split("、") if x.strip()]
-        replace = (self.write_mode or "重建索引") == "重建索引"
+        types_raw = (self.entity_types or "").replace("，", ",").replace("、", ",")
+        entity_types = [x.strip() for x in types_raw.split(",") if x.strip()]
+        write_mode = self.write_mode or "Rebuild index"
+        replace = write_mode in {"Rebuild index", "重建索引"}
+        method_raw = self.indexing_method or "Standard GraphRAG"
         method = (
             "fast"
-            if (self.indexing_method or "").startswith("Fast")
+            if method_raw.startswith("Fast") or "FastGraphRAG" in method_raw
             else "standard"
         )
         try:
@@ -148,11 +152,13 @@ class GraphRAGKBBuildComponent(Component):
                 extract_claims=bool(self.extract_claims) and method == "standard",
                 chunk_enabled=bool(self.chunk_enabled),
                 chunk_size=int(self.chunk_size or DEFAULT_CHUNK_SIZE),
-                chunk_overlap=int(self.chunk_overlap if self.chunk_overlap is not None else DEFAULT_CHUNK_OVERLAP),
+                chunk_overlap=int(
+                    self.chunk_overlap if self.chunk_overlap is not None else DEFAULT_CHUNK_OVERLAP
+                ),
                 indexing_method=method,
             )
         except Exception as e:
-            msg = f"GraphRAG 建库失败：{e}"
+            msg = f"GraphRAG indexing failed: {e}"
             raise ValueError(msg) from e
         self._last_summary = summary
         self._last_kb = kb
@@ -167,4 +173,4 @@ class GraphRAGKBBuildComponent(Component):
         if self._last_summary is None:
             self._run_build()
         summary = self._last_summary or {}
-        return Data(text=summary.get("message") or "建库完成", data=summary)
+        return Data(text=summary.get("message") or "Indexing complete", data=summary)

@@ -89,5 +89,5 @@ def test_entity_to_sources_and_reverse() -> None:
 def test_entity_missing_raises() -> None:
     index = _sample_index()
     link_provenance(index)
-    with pytest.raises(ValueError, match="未找到实体"):
+    with pytest.raises(ValueError, match="Entity .* not found"):
         entity_to_sources(index, "不存在的实体")

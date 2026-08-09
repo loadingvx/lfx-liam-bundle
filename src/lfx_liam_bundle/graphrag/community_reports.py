@@ -72,7 +72,7 @@ def generate_community_reports(
     text_units: list[TextUnit] | None = None,
 ) -> list[CommunityReport]:
     if llm is None:
-        msg = "生成社区报告需要 LLM。请连接语言模型后重试。"
+        msg = "Generating community reports requires an LLM. Connect a language model and retry."
         raise ValueError(msg)
     ent_by_id = {e.id: e for e in entities}
     unit_by_id = {u.id: u for u in (text_units or [])}
@@ -149,6 +149,6 @@ def generate_community_reports(
             )
         )
     if not reports:
-        msg = "未能生成任何社区报告。请确认实体抽取与社区检测是否成功。"
+        msg = "No community reports were generated. Confirm entity extraction and community detection succeeded."
         raise ValueError(msg)
     return reports

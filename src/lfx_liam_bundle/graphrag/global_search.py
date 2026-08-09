@@ -76,7 +76,7 @@ def _chunk_reports_by_tokens(
 
 def select_level_reports(index: GraphIndex, level: int | None) -> list[CommunityReport]:
     if not index.community_reports:
-        msg = "知识库中没有社区报告。请先完成完整 GraphRAG「入库建图」。"
+        msg = "No community reports in the knowledge base. Complete GraphRAG Index Builder first."
         raise ValueError(msg)
     levels = sorted({r.level for r in index.community_reports})
     chosen = level if level is not None else levels[0]
@@ -95,7 +95,7 @@ def select_reports_dynamically(
     relevance_threshold: int = 50,
 ) -> list[CommunityReport]:
     if not index.community_reports:
-        msg = "知识库中没有社区报告，无法执行动态 Global Search。"
+        msg = "No community reports; cannot run dynamic Global Search."
         raise ValueError(msg)
     reports_map = {r.community_id: r for r in index.community_reports}
     communities = {c.id: c for c in index.communities}
@@ -197,20 +197,20 @@ def global_search(
     dynamic_community_selection: bool = False,
     max_data_tokens: int = 8000,
     conversation_history: str | None = None,
-    response_type: str = "多段落中文回答",
+    response_type: str = "Multi-paragraph answer",
     allow_general_knowledge: bool = False,
     map_concurrency: int = 1,
 ) -> tuple[list[Document], str, dict[str, Any]]:
     if llm is None:
-        msg = "Global Search 需要 LLM（Map-Reduce）。请在检索组件连接语言模型。"
+        msg = "Global Search needs an LLM (Map-Reduce). Connect a language model on Retrieve."
         raise ValueError(msg)
     if not (query or "").strip():
-        msg = "检索问题不能为空。"
+        msg = "Search query cannot be empty."
         raise ValueError(msg)
 
     index = load_index(kb)
     if not index.community_reports:
-        msg = "知识库尚未生成社区报告，无法 Global Search。请先入库建图。"
+        msg = "No community reports yet; cannot run Global Search. Index documents first."
         raise ValueError(msg)
 
     if dynamic_community_selection:
@@ -260,7 +260,7 @@ def global_search(
 
     points = sorted(points, key=lambda p: p.get("score", 0), reverse=True)[:top_points]
     if not points:
-        msg = "Global Search 未能从社区报告中提取到有效要点。可尝试动态社区选择或更换社区层级。"
+        msg = "Global Search found no usable points from community reports. Try dynamic community selection or another community level."
         raise ValueError(msg)
 
     points_block = join_under_budget(
@@ -268,16 +268,16 @@ def global_search(
         max_tokens=max(256, max_data_tokens // 2),
     )
     gk_note = (
-        "可适度结合通用世界知识补充解释，但须标明哪些来自数据集、哪些来自通用知识。"
+        "You may lightly use general world knowledge for explanation, but mark what comes from the dataset vs general knowledge."
         if allow_general_knowledge
-        else "不要引入数据集之外的通用知识。"
+        else "Do not introduce general knowledge outside the dataset."
     )
     answer = invoke_llm(
         llm,
         REDUCE_PROMPT.format(
             query=query,
             points=points_block,
-            response_type=response_type or "多段落中文回答",
+            response_type=response_type or "Multi-paragraph answer",
             general_knowledge_note=gk_note,
             history_block=_history_block(conversation_history),
         ),

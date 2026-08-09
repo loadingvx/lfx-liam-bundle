@@ -31,7 +31,7 @@ def test_kb_roundtrip_data() -> None:
 
 
 def test_from_data_rejects_plain_data() -> None:
-    with pytest.raises(ValueError, match="知识库实例"):
+    with pytest.raises(ValueError, match="KB instance|knowledge base|Knowledge Base"):
         GraphRAGKnowledgeBase.from_data(Data(text="x", data={"foo": 1}))
 
 

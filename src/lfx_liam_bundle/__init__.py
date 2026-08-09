@@ -1,7 +1,8 @@
-"""lfx-liam-bundle：Liam 的 Langflow 扩展工具包。
+"""lfx-liam-bundle: Liam's Langflow extension toolkit.
 
-通过 ``langflow.extensions`` entry-point 发现 ``extension.json``，
-注册 bundle ``liam``。当前导出 GraphRAG 相关控件；后续其它能力也应挂在同一 bundle 下。
+Discovered via the ``langflow.extensions`` entry-point and ``extension.json``,
+registering bundle ``liam``. Ships GraphRAG components today; further tools
+should join the same bundle.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from lfx_liam_bundle.components.liam.kb_retrieve import GraphRAGKBRetrieveCompon
 
 try:
     __version__ = version("lfx-liam-bundle")
-except PackageNotFoundError:  # pragma: no cover - 未安装/未 editable 时的兜底
+except PackageNotFoundError:  # pragma: no cover - fallback when not installed/editable
     __version__ = "0.0.0+local"
 
 __all__ = [

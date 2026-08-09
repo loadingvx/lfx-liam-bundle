@@ -57,7 +57,7 @@ def ensure_kg_schema(kb: GraphRAGKnowledgeBase, *, create_if_missing: bool = Tru
     elif kb.backend == "arangodb":
         _arango_ensure(kb, names, create_if_missing=create_if_missing)
     else:
-        msg = f"不支持的后端：{kb.backend}。请选择 AstraDB 或 ArangoDB。"
+        msg = f"Unsupported backend: {kb.backend}. Choose AstraDB or ArangoDB."
         raise ValueError(msg)
 
 
@@ -116,7 +116,7 @@ def persist_index(
                 raise
             stats["vector_ann"] = "failed"
             stats["vector_ann_warning"] = (
-                f"向量索引未就绪，Local Search 将回退精确余弦：{e}"
+                f"Vector index not ready; Local Search will fall back to exact cosine: {e}"
             )
     else:
         stats["vector_ann"] = "disabled"
@@ -490,8 +490,8 @@ def clear_index(kb: GraphRAGKnowledgeBase) -> dict[str, Any]:
     kb.document_count = 0
     kb.status = "empty"
     kb.message = (
-        "已清空 GraphRAG 知识库"
-        "（documents/chunks/entities/relationships/communities/reports/covariates）。"
+        "Cleared GraphRAG knowledge base "
+        "(documents/chunks/entities/relationships/communities/reports/covariates)."
     )
     return {"cleared": True, "message": kb.message, "collections": names}
 
@@ -540,7 +540,7 @@ def _astra_db(kb: GraphRAGKnowledgeBase):
 
     endpoint = (kb.api_endpoint or "").strip()
     if not endpoint:
-        msg = "Astra/Data API 需要填写 API Endpoint（云上 Astra 或本地 http://host:8181）。"
+        msg = "Astra/Data API requires an API Endpoint (cloud Astra or local http://host:8181)."
         raise ValueError(msg)
 
     env_name = (kb.data_api_environment or "astra").strip().lower()
@@ -551,8 +551,8 @@ def _astra_db(kb: GraphRAGKnowledgeBase):
         password = kb.data_api_password or ""
         if not user:
             msg = (
-                "本地/自建 Data API（HCD）需要填写用户名与密码。"
-                "请在知识库组件高级选项中配置，或设置 data_api_username/password。"
+                "Local/self-hosted Data API (HCD) requires username and password. "
+                "Configure advanced options on Knowledge Base, or set data_api_username/password."
             )
             raise ValueError(msg)
         token = UsernamePasswordTokenProvider(user, password)
@@ -561,7 +561,7 @@ def _astra_db(kb: GraphRAGKnowledgeBase):
 
     token = (kb.token or "").strip()
     if not token:
-        msg = "AstraDB 云环境需要填写 Application Token。"
+        msg = "Cloud AstraDB requires an Application Token."
         raise ValueError(msg)
     client = DataAPIClient(token)
     return client.get_database(endpoint, token=token, keyspace=keyspace)
@@ -577,7 +577,7 @@ def _astra_ensure(
             continue
         if name not in existing:
             if not create_if_missing:
-                msg = f"Astra 集合「{name}」不存在。请开启「不存在则创建」，或先在控制台建好集合。"
+                msg = f"Astra collection 「{name}」 does not exist. Enable Create if missing, or create it in the console."
                 raise ValueError(msg)
             db.create_collection(name)
 
@@ -668,7 +668,7 @@ def _arango_db(kb: GraphRAGKnowledgeBase):
     from arango import ArangoClient
 
     if not kb.arango_url:
-        msg = "ArangoDB 需要填写服务地址（如 http://localhost:8529）。"
+        msg = "ArangoDB requires a service URL (e.g. http://localhost:8529)."
         raise ValueError(msg)
     client = ArangoClient(hosts=kb.arango_url)
     sys_db = client.db(
@@ -690,7 +690,7 @@ def _arango_ensure(
         edge = key == "edges"
         if not db.has_collection(name):
             if not create_if_missing:
-                msg = f"Arango 集合「{name}」不存在。请开启「不存在则创建」。"
+                msg = f"Arango collection 「{name}」 does not exist. Enable Create if missing."
                 raise ValueError(msg)
             db.create_collection(name, edge=edge)
     graph_name = kb.graph_name or f"{_base_name(kb)}_kg_graph"

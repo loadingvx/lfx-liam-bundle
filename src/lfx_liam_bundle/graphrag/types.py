@@ -1,4 +1,4 @@
-"""GraphRAG 知识库实例协议。"""
+"""GraphRAG knowledge-base instance protocol."""
 
 from __future__ import annotations
 
@@ -14,19 +14,19 @@ Status = Literal["ready", "empty", "error"]
 
 @dataclass
 class GraphRAGKnowledgeBase:
-    """建库侧与检索侧共享的知识库实例句柄。"""
+    """Shared KB handle for indexing and retrieve flows."""
 
     backend: Backend
     name: str
     collection_name: str
     status: Status = "empty"
-    message: str = "知识库已连接，尚未入库。"
+    message: str = "Knowledge base connected; not indexed yet."
     document_count: int = 0
-    # Astra / 本地 Data API (HCD)
+    # Astra / local Data API (HCD)
     api_endpoint: str = ""
     token: str = ""
     keyspace: str = "default_keyspace"
-    # astra=云上 AstraDB；hcd=本地/自建 Data API（用户名密码）
+    # astra = cloud AstraDB; hcd = local/self-hosted Data API (username/password)
     data_api_environment: Literal["astra", "hcd"] = "astra"
     data_api_username: str = ""
     data_api_password: str = ""
@@ -40,10 +40,10 @@ class GraphRAGKnowledgeBase:
     embedding_dim: int | None = None
     metric: str = "cosine"
     use_vector_index: bool = True
-    # Arango Faiss factory 模板；实际 IVF 基数会按文档数自动收缩
+    # Arango Faiss factory template; IVF list count shrinks for small corpora
     vector_index_factory: str = "IVF100_HNSW10,Flat"
     vector_n_lists: int | None = None
-    # ANN 失败时是否回退进程内精确余弦（建议保持开启，避免检索直接报错）
+    # Fall back to in-process exact cosine when ANN fails (recommended)
     ann_fallback_exact: bool = True
 
     def to_dict(self) -> dict[str, Any]:
@@ -53,8 +53,8 @@ class GraphRAGKnowledgeBase:
 
     def to_data(self) -> Data:
         text = (
-            f"知识库「{self.name}」[{self.backend}] "
-            f"集合={self.collection_name} 状态={self.status} 文档数={self.document_count}"
+            f"KB 「{self.name}」[{self.backend}] "
+            f"prefix={self.collection_name} status={self.status} docs={self.document_count}"
         )
         return Data(text=text, data=self.to_dict())
 
@@ -73,16 +73,22 @@ class GraphRAGKnowledgeBase:
         if isinstance(value, Data):
             payload = value.data if isinstance(value.data, dict) else {}
             if not payload.get(KB_MARKER):
-                msg = "输入不是有效的 GraphRAG 知识库实例。请先连接「GraphRAG 知识库」组件。"
+                msg = (
+                    "Input is not a valid GraphRAG KB instance. "
+                    "Connect the GraphRAG Knowledge Base component first."
+                )
                 raise ValueError(msg)
             return cls.from_dict(payload)
         if isinstance(value, dict) and value.get(KB_MARKER):
             return cls.from_dict(value)
-        msg = "未收到知识库实例。请将「GraphRAG 知识库」或「入库建图」的输出连接到本组件。"
+        msg = (
+            "No KB instance received. Connect the output of GraphRAG Knowledge Base "
+            "or GraphRAG Index Builder to this component."
+        )
         raise ValueError(msg)
 
     def public_summary(self) -> dict[str, Any]:
-        """日志/状态用摘要（不含密钥）。"""
+        """Status/log summary without secrets."""
         return {
             "backend": self.backend,
             "name": self.name,

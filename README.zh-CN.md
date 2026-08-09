@@ -22,20 +22,22 @@ langflow.extensions 入口
 | 层级 | 职责 |
 |------|------|
 | `extension.json` | 扩展标识、展示名、bundle 注册 |
-| `components/liam/` | Langflow 控件（参数、校验、中文提示） |
+| `components/liam/` | Langflow 控件（参数、校验、英文界面文案） |
 | 领域包 | 与 UI 解耦的业务实现（目前主要是 `graphrag/`） |
 
 新能力优先以**新控件**（必要时加新领域包）接入同一 `liam` bundle，不必都做成 GraphRAG。
 
 ## 当前支持的 Langflow 控件
 
-| 控件（界面名称） | 作用 |
-|------------------|------|
-| GraphRAG 知识库 | 创建或连接知识库实例（AstraDB / ArangoDB） |
-| GraphRAG 入库建图 | 文档入库、建图、写社区报告 |
-| GraphRAG 检索 | Local / Global / DRIFT 检索 |
-| GraphRAG 知识库维护 | 规模统计、清空（危险操作） |
-| GraphRAG 溯源查询 | 实体 ↔ 原文片段双向溯源 |
+界面名称与帮助文案为**英文**（与 Langflow UI 一致）：
+
+| 控件（Display name） | 作用 |
+|----------------------|------|
+| GraphRAG Knowledge Base | 创建或连接知识库实例（AstraDB / ArangoDB） |
+| GraphRAG Index Builder | 文档入库、建图、写社区报告 |
+| GraphRAG Retrieve | Local / Global / DRIFT 检索 |
+| GraphRAG Maintain | 规模统计、清空（危险操作，确认语 `CONFIRM DELETE`） |
+| GraphRAG Provenance | 实体 ↔ 原文片段双向溯源 |
 
 安装后在 Langflow 中打开 **Liam** 分组，或搜索 `GraphRAG` / `Liam`。
 

@@ -124,7 +124,7 @@ def entity_to_sources(index: GraphIndex, entity_key: str) -> dict[str, Any]:
     """实体 → 原文片段 / 所属文档（正向溯源）。"""
     entity = resolve_entity(index, entity_key)
     if entity is None:
-        msg = f"未找到实体「{entity_key}」。请使用实体名称或实体 ID。"
+        msg = f"Entity 「{entity_key}」 not found. Use an entity name or entity ID."
         raise ValueError(msg)
     units_by_id = {u.id: u for u in index.text_units}
     docs_by_id = {d.id: d for d in index.documents}
@@ -171,9 +171,12 @@ def entity_to_sources(index: GraphIndex, entity_key: str) -> dict[str, Any]:
         "source_count": len(sources),
         "relationships": rels[:40],
         "message": (
-            f"实体「{entity.title}」对应 {len(sources)} 个原文片段。"
+            f"Entity 「{entity.title}」 maps to {len(sources)} text unit(s)."
             if sources
-            else f"实体「{entity.title}」没有关联原文片段（建图时未写入 text_unit_ids）。"
+            else (
+                f"Entity 「{entity.title}」 has no linked text units "
+                "(text_unit_ids were not written during indexing)."
+            )
         ),
     }
 
@@ -183,7 +186,7 @@ def text_unit_to_graph(index: GraphIndex, text_unit_id: str) -> dict[str, Any]:
     uid = (text_unit_id or "").strip()
     unit = next((u for u in index.text_units if u.id == uid), None)
     if unit is None:
-        msg = f"未找到文本单元「{text_unit_id}」。"
+        msg = f"Text unit 「{text_unit_id}」 not found."
         raise ValueError(msg)
 
     ents_by_id = {e.id: e for e in index.entities}
@@ -227,8 +230,8 @@ def text_unit_to_graph(index: GraphIndex, text_unit_id: str) -> dict[str, Any]:
         "relationships": relationships,
         "covariates": covariates,
         "message": (
-            f"文本单元「{unit.id}」关联实体 {len(entities)} 个、关系 {len(relationships)} 条、"
-            f"声明 {len(covariates)} 条。"
+            f"Text unit 「{unit.id}」 links to {len(entities)} entit(ies), "
+            f"{len(relationships)} relationship(s), {len(covariates)} claim(s)."
         ),
     }
 
@@ -245,7 +248,7 @@ def document_to_graph(index: GraphIndex, document_id: str) -> dict[str, Any]:
             None,
         )
     if doc is None:
-        msg = f"未找到文档「{document_id}」。"
+        msg = f"Document 「{document_id}」 not found."
         raise ValueError(msg)
 
     units = [u for u in index.text_units if u.id in set(doc.text_unit_ids) or u.document_id == doc.id]
@@ -270,7 +273,10 @@ def document_to_graph(index: GraphIndex, document_id: str) -> dict[str, Any]:
         },
         "text_units": [{"id": u.id, "preview": u.text[:160], "entity_ids": list(u.entity_ids)} for u in units],
         "entities": entities,
-        "message": f"文档「{doc.title or doc.id}」含 {len(units)} 个文本单元、{len(entities)} 个实体。",
+        "message": (
+            f"Document 「{doc.title or doc.id}」 has {len(units)} text unit(s) "
+            f"and {len(entities)} entit(ies)."
+        ),
     }
 
 

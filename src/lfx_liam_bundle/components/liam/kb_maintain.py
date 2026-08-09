@@ -1,4 +1,4 @@
-"""知识库维护：统计 / 清空（完整 GraphRAG 表）。"""
+"""Knowledge-base maintenance: stats / clear."""
 
 from __future__ import annotations
 
@@ -9,64 +9,70 @@ from lfx.schema.data import Data
 from lfx_liam_bundle.graphrag.kg_store import clear_index, load_index
 from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
+_CONFIRM_PHRASE = "CONFIRM DELETE"
+
 
 class GraphRAGKBMaintainComponent(Component):
-    display_name = "GraphRAG 知识库维护"
-    description = "统计 GraphRAG 知识模型规模，或清空（危险操作需确认）。"
+    display_name = "GraphRAG Maintain"
+    description = "Show GraphRAG knowledge-model stats, or clear the KB (destructive; confirmation required)."
     name = "LiamGraphRAGMaintain"
     icon = "Trash2"
 
     inputs = [
         HandleInput(
             name="kb_instance",
-            display_name="知识库实例",
+            display_name="KB instance",
             input_types=["Data"],
             required=True,
         ),
         DropdownInput(
             name="operation",
-            display_name="操作",
-            options=["统计", "清空知识库"],
-            value="统计",
+            display_name="Operation",
+            options=["Stats", "Clear knowledge base"],
+            value="Stats",
         ),
         StrInput(
             name="confirm_text",
-            display_name="清空确认语",
+            display_name="Clear confirmation phrase",
             value="",
-            info="清空时必须输入：确认清空",
+            info=f"To clear, type exactly: {_CONFIRM_PHRASE}",
             advanced=True,
         ),
     ]
 
     outputs = [
-        Output(display_name="知识库实例", name="kb_instance_out", method="run_maintain"),
-        Output(display_name="操作结果", name="result", method="run_result"),
+        Output(display_name="KB instance", name="kb_instance_out", method="run_maintain"),
+        Output(display_name="Operation result", name="result", method="run_result"),
     ]
 
     _last_result: dict | None = None
 
     def _execute(self) -> GraphRAGKnowledgeBase:
         kb = GraphRAGKnowledgeBase.from_data(self.kb_instance)
-        op = self.operation or "统计"
-        if op == "统计":
+        op = self.operation or "Stats"
+        if op in {"Stats", "统计"}:
             index = load_index(kb)
             stats = index.stats()
             kb.document_count = stats["text_units"]
             kb.status = "ready" if kb.document_count or stats["entities"] else "empty"
             kb.message = (
-                f"统计：文本单元 {stats['text_units']}，实体 {stats['entities']}，"
-                f"关系 {stats['relationships']}，社区 {stats['communities']}（{stats['community_levels']} 层），"
-                f"报告 {stats['community_reports']}，声明 {stats.get('covariates', 0)}。"
+                f"Stats: text units {stats['text_units']}, entities {stats['entities']}, "
+                f"relationships {stats['relationships']}, communities {stats['communities']} "
+                f"({stats['community_levels']} levels), reports {stats['community_reports']}, "
+                f"claims {stats.get('covariates', 0)}."
             )
             result = {"operation": op, **stats, "message": kb.message}
-        elif op == "清空知识库":
-            if (self.confirm_text or "").strip() != "确认清空":
-                msg = "清空是危险操作。请在「清空确认语」中精确输入：确认清空"
+        elif op in {"Clear knowledge base", "清空知识库"}:
+            confirm = (self.confirm_text or "").strip()
+            if confirm not in {_CONFIRM_PHRASE, "确认清空"}:
+                msg = (
+                    f"Clear is destructive. Type exactly in Clear confirmation phrase: {_CONFIRM_PHRASE}"
+                )
                 raise ValueError(msg)
             result = clear_index(kb)
             result["operation"] = op
         else:
-            msg = f"未知操作：{op}"
+            msg = f"Unknown operation: {op}"
             raise ValueError(msg)
         self._last_result = result
         self.status = result.get("message") or kb.message
@@ -79,4 +85,4 @@ class GraphRAGKBMaintainComponent(Component):
         if self._last_result is None:
             self._execute()
         result = self._last_result or {}
-        return Data(text=result.get("message") or "完成", data=result)
+        return Data(text=result.get("message") or "Done", data=result)

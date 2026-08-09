@@ -1,48 +1,48 @@
-# 最短可用 Flow
+# Minimal working flow
 
-面向第一次把 GraphRAG 跑通的用户。
+First-time path to get GraphRAG running end to end.
 
-## 准备
+## Prerequisites
 
-| 后端 | 需要 |
-|------|------|
-| AstraDB | Endpoint、Token、前缀名；Embedding + LLM |
-| ArangoDB | URL、库、账号密码、前缀名；向量索引已开启；Embedding + LLM |
+| Backend | You need |
+|---------|----------|
+| AstraDB | Endpoint, Token, collection prefix; Embedding + LLM |
+| ArangoDB | URL, database, credentials, prefix; vector index enabled; Embedding + LLM |
 
-## 步骤
+## Steps
 
-1. **GraphRAG 知识库**  
-   - 选后端，前缀例如 `liam_graphrag`  
-   - 保持「启用向量库 ANN 检索」开启  
-   - 运行至提示已连接  
+1. **GraphRAG Knowledge Base**  
+   - Pick a backend; prefix e.g. `liam_graphrag`  
+   - Keep **Enable vector ANN retrieval** on  
+   - Run until status shows connected  
 
-2. **GraphRAG 入库建图**  
-   - 接知识库实例、文档、Embedding、LLM  
-   - 模式先选「标准 GraphRAG」或「FastGraphRAG」  
-   - 写入模式选「重建索引」跑通一次  
-   - 确认汇总里有实体/社区/报告，且 ANN 就绪  
+2. **GraphRAG Index Builder**  
+   - Wire KB instance, documents, Embedding, LLM  
+   - Indexing method: **Standard GraphRAG** or **FastGraphRAG**  
+   - Write mode: **Rebuild index** for the first successful run  
+   - Confirm summary has entities/communities/reports and ANN ready  
 
-3. **GraphRAG 检索**  
-   - 同一知识库 + **同一 Embedding**  
-   - 先用 Local Search 问一个具体问题  
+3. **GraphRAG Retrieve**  
+   - Same KB + **same Embedding** as indexing  
+   - Start with Local Search on a concrete question  
 
-可选：
+Optional:
 
-- **GraphRAG 溯源查询**：用实体名或原文 ID 核对来源  
-- **GraphRAG 知识库维护**：看统计；清空时确认语填 `确认清空`
+- **GraphRAG Provenance**: verify sources by entity name or text-unit ID  
+- **GraphRAG Maintain**: view **Stats**; to clear, type exactly `CONFIRM DELETE`
 
-## 接线示意
+## Wiring sketch
 
 ```text
-[文档] ──┐
-[Embed] ─┤
-[LLM] ───┼→ [入库建图] → [检索] → 答案
-[知识库] ┘
+[Documents] ──┐
+[Embedding] ──┤
+[LLM] ────────┼→ [Index Builder] → [Retrieve] → answer
+[KB] ─────────┘
 ```
 
-## 相关文档
+## Related
 
-- [知识库](../components/graphrag-kb.md)  
-- [入库建图](../components/graphrag-build.md)  
-- [检索](../components/graphrag-retrieve.md)  
-- [Arango 排障](arango.md)
+- [Knowledge Base](../components/graphrag-kb.md)  
+- [Index Builder](../components/graphrag-build.md)  
+- [Retrieve](../components/graphrag-retrieve.md)  
+- [Arango troubleshooting](arango.md)

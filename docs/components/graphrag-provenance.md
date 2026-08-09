@@ -1,52 +1,52 @@
-# GraphRAG 溯源查询
+# GraphRAG Provenance
 
-| 项 | 值 |
-|----|-----|
-| 界面名称 | GraphRAG 溯源查询 |
-| 内部名称 | `LiamGraphRAGProvenance` |
-| 源码 | `components/liam/kb_provenance.py` |
-| 作用 | 实体 ↔ 原文 ↔ 文档 双向溯源，核对答案是否锚定源材料 |
+| Item | Value |
+|------|-------|
+| Display name | GraphRAG Provenance |
+| Internal name | `LiamGraphRAGProvenance` |
+| Source | `components/liam/kb_provenance.py` |
+| Role | Bidirectional entity ↔ text unit ↔ document provenance |
 
-## 用途
+## Purpose
 
-建图时会写入双向链接。本控件用于人工核对：
+Indexing writes bidirectional links. Use this control to verify answers are grounded:
 
-| 查询方向 | 含义 |
-|----------|------|
-| 实体 → 原文 | 某实体来自哪些 TextUnit |
-| 原文 → 实体 | 某片段抽到了哪些实体/关系 |
-| 文档 → 图元素 | 按文档聚合相关图元素 |
+| Lookup direction | Meaning |
+|------------------|---------|
+| Entity → Text Units | Which TextUnits support an entity |
+| Text Unit → Entities | Entities/relationships from a unit |
+| Document → Graph Elements | Graph elements aggregated by document |
 
-## 主要输入
+## Main inputs
 
-| 参数 | 说明 |
-|------|------|
-| 知识库实例 | 已建图的实例 |
-| 查询方向 | 上表三种之一 |
-| 查询键 | 实体名/实体 ID、文本单元 ID、或文档 ID/标题 |
+| Parameter | Notes |
+|-----------|-------|
+| KB instance | Indexed instance |
+| Lookup direction | One of the three above |
+| Lookup key | Entity name/ID, text-unit ID, or document ID/title |
 
-## 输出
+## Outputs
 
-| 输出 | 说明 |
-|------|------|
-| 溯源结果 | 结构化溯源信息 |
-| 知识库实例 | 原样传出，便于串联 |
+| Output | Notes |
+|--------|-------|
+| Provenance result | Structured provenance payload |
+| KB instance | Pass-through for chaining |
 
-## 典型接线
+## Typical wiring
 
 ```text
-[GraphRAG 知识库] → [GraphRAG 溯源查询] → 溯源结果
+[GraphRAG Knowledge Base] → [GraphRAG Provenance] → provenance result
 ```
 
-也可在检索后，用答案中的实体名或 TextUnit ID 再查本控件。
+You can also look up entity names or TextUnit IDs from a retrieve answer.
 
-## 注意点
+## Notes
 
-- 必须先完成入库建图，否则无链接可查。  
-- 查询键与模式要匹配；填错模式会查不到或结果不准。  
-- Local / DRIFT 答案中的引用线索可与本控件交叉验证。
+- Index first; otherwise there are no links to query.  
+- Match key type to lookup direction.  
+- Citations from Local / DRIFT can be cross-checked here.
 
-## 相关文档
+## Related
 
-- [检索](graphrag-retrieve.md)  
-- [入库建图](graphrag-build.md)
+- [Retrieve](graphrag-retrieve.md)  
+- [Index Builder](graphrag-build.md)

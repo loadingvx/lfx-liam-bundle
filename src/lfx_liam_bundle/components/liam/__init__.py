@@ -1,4 +1,4 @@
-"""Liam bundle 下的 Langflow 控件集合（当前以 GraphRAG 为主）。"""
+"""Langflow components for the Liam bundle (GraphRAG today)."""
 
 from __future__ import annotations
 

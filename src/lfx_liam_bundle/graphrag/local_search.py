@@ -65,7 +65,7 @@ def build_local_context(
     query_vector: list[float] | None = None,
 ) -> tuple[str, list[Document], dict[str, Any]]:
     if not index.entities:
-        msg = "知识库中没有实体，无法 Local Search。请先完成入库建图。"
+        msg = "No entities in the knowledge base; cannot run Local Search. Index documents first."
         raise ValueError(msg)
 
     budget = allocate_budget(
@@ -90,7 +90,7 @@ def build_local_context(
         )[:top_k_entities]
         ranking_source = "exact_cosine" if seed_entity_ids else ranking_source
     if not ranked_entities:
-        msg = "未能匹配到相关实体。请换个问法，或确认建图内容是否覆盖该主题。"
+        msg = "No matching entities. Rephrase the query, or confirm indexing covers this topic."
         raise ValueError(msg)
 
     seed_titles = {_norm(e.title) for e in ranked_entities}
@@ -245,7 +245,7 @@ def local_search(
     text_unit_prop: float = 0.5,
     community_prop: float = 0.25,
     conversation_history: str | None = None,
-    response_type: str = "多段落中文回答",
+    response_type: str = "Multi-paragraph answer",
 ) -> tuple[list[Document], str, dict[str, Any]]:
     from lfx_liam_bundle.graphrag.vector_search import ann_search_entities
 
@@ -261,12 +261,12 @@ def local_search(
                 seed_ids = [doc_id for doc_id, _ in hits]
                 ranking_source = f"ann:{kb.backend}"
             else:
-                ann_warning = "向量检索未返回实体，已回退精确余弦。"
+                ann_warning = "Vector search returned no entities; fell back to exact cosine."
                 ranking_source = "exact_cosine_fallback"
         except Exception as e:
             if not kb.ann_fallback_exact:
                 raise
-            ann_warning = f"向量检索不可用，已回退精确余弦：{e}"
+            ann_warning = f"Vector search unavailable; fell back to exact cosine: {e}"
             ranking_source = "exact_cosine_fallback"
 
     if seed_ids:
@@ -297,7 +297,7 @@ def local_search(
             LOCAL_ANSWER_PROMPT.format(
                 query=query,
                 context=context,
-                response_type=response_type or "多段落中文回答",
+                response_type=response_type or "Multi-paragraph answer",
                 history_block=_history_block(conversation_history),
             ),
         )
@@ -306,9 +306,9 @@ def local_search(
                 f"- [{c['text_unit_id']}] {c.get('document_title') or c.get('document_id')}: {c['preview'][:120]}"
                 for c in meta["citations"]
             )
-            answer = f"{answer.strip()}\n\n---\n【可核对原文出处】\n{cite_lines}"
+            answer = f"{answer.strip()}\n\n---\n[Source text units]\n{cite_lines}"
         meta["answer"] = answer
         return docs, answer, meta
     if answer_with_llm and llm is None:
-        meta["warning"] = "未连接 LLM，已返回检索上下文（未生成最终答案）。"
+        meta["warning"] = "No LLM connected; returned retrieval context (no final answer)."
     return docs, context, meta

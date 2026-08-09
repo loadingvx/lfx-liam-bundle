@@ -31,7 +31,7 @@ def retrieve_documents(
     text_unit_prop: float = 0.5,
     community_prop: float = 0.25,
     conversation_history: str | None = None,
-    response_type: str = "多段落中文回答",
+    response_type: str = "Multi-paragraph answer",
     allow_general_knowledge: bool = False,
     map_concurrency: int = 1,
     drift_n_depth: int = 2,
@@ -39,10 +39,10 @@ def retrieve_documents(
     drift_max_follow_ups: int = 3,
 ) -> tuple[list[Document], str, dict[str, Any]]:
     if not (query or "").strip():
-        msg = "检索问题不能为空。"
+        msg = "Search query cannot be empty."
         raise ValueError(msg)
     if kb.status == "error":
-        msg = f"知识库状态异常：{kb.message}"
+        msg = f"Knowledge base is in an error state: {kb.message}"
         raise ValueError(msg)
 
     mode = (search_mode or "Local Search").strip()
@@ -61,10 +61,10 @@ def retrieve_documents(
         )
     if mode == "DRIFT Search":
         if embedding is None:
-            msg = "DRIFT Search 需要 Embedding 模型。"
+            msg = "DRIFT Search requires an Embedding model."
             raise ValueError(msg)
         if llm is None:
-            msg = "DRIFT Search 必须连接 LLM。"
+            msg = "DRIFT Search requires an LLM connection."
             raise ValueError(msg)
         return drift_search(
             kb,
@@ -84,7 +84,7 @@ def retrieve_documents(
         )
     if mode == "Local Search":
         if embedding is None:
-            msg = "Local Search 需要 Embedding 模型。请连接 Embedding。"
+            msg = "Local Search requires an Embedding model. Connect Embedding."
             raise ValueError(msg)
         return local_search(
             kb,
@@ -101,7 +101,7 @@ def retrieve_documents(
             response_type=response_type,
         )
     msg = (
-        f"不支持的检索模式：{mode}。"
-        "请选择 Local Search、Global Search 或 DRIFT Search。"
+        f"Unsupported search mode: {mode}. "
+        "Choose Local Search, Global Search, or DRIFT Search."
     )
     raise ValueError(msg)

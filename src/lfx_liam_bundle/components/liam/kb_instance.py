@@ -1,4 +1,4 @@
-"""建库侧：GraphRAG 知识库实例（创建/连接）。"""
+"""Build side: GraphRAG knowledge-base instance (create / connect)."""
 
 from __future__ import annotations
 
@@ -11,74 +11,77 @@ from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
 
 class GraphRAGKBInstanceComponent(Component):
-    display_name = "GraphRAG 知识库"
-    description = "创建或连接 GraphRAG 知识库实例（AstraDB / ArangoDB）。建库与检索都围绕此实例。"
+    display_name = "GraphRAG Knowledge Base"
+    description = (
+        "Create or connect a GraphRAG knowledge-base instance (AstraDB / ArangoDB). "
+        "Build and retrieve flows share this instance."
+    )
     name = "LiamGraphRAGKB"
     icon = "Database"
 
     inputs = [
         DropdownInput(
             name="backend",
-            display_name="存储后端",
+            display_name="Storage backend",
             options=["AstraDB", "ArangoDB"],
             value="AstraDB",
-            info="仅支持 AstraDB 与 ArangoDB。",
+            info="Supports AstraDB and ArangoDB only.",
             required=True,
         ),
         StrInput(
             name="kb_name",
-            display_name="知识库名称",
+            display_name="Knowledge base name",
             value="default",
-            info="用于界面识别的显示名。",
+            info="Display name used in the UI.",
             required=True,
         ),
         StrInput(
             name="collection_name",
-            display_name="知识库前缀名",
+            display_name="Collection prefix",
             value="liam_graphrag",
             info=(
-                "存储前缀，系统会自动创建 "
-                "`{前缀}_chunks/_entities/_relationships/_communities/_reports` 等集合。"
-                "不要手动加 `_chunks` 后缀。"
+                "Storage prefix. The system creates collections such as "
+                "`{prefix}_chunks/_entities/_relationships/_communities/_reports`. "
+                "Do not append `_chunks` yourself."
             ),
             required=True,
         ),
         BoolInput(
             name="create_if_missing",
-            display_name="不存在则创建",
+            display_name="Create if missing",
             value=True,
-            info="目标集合不存在时自动创建。",
+            info="Create target collections when they do not exist.",
         ),
         MessageTextInput(
             name="api_endpoint",
             display_name="Astra / Data API Endpoint",
-            info="云上 Astra Endpoint，或本地 HCD Data API（如 http://localhost:8181）。",
+            info="Cloud Astra endpoint, or local HCD Data API (e.g. http://localhost:8181).",
         ),
         SecretStrInput(
             name="token",
             display_name="Astra Token",
-            info="仅云上 Astra 需要。本地 HCD 用下方用户名密码。",
+            info="Required for cloud Astra. Local HCD uses username/password below.",
         ),
         DropdownInput(
             name="data_api_environment",
-            display_name="Data API 环境",
+            display_name="Data API environment",
             options=["astra", "hcd"],
             value="astra",
             advanced=True,
-            info="astra=云上 AstraDB；hcd=本地/自建 Data API（用户名密码）。",
+            info="astra = cloud AstraDB; hcd = local/self-hosted Data API (username/password).",
         ),
         StrInput(
             name="data_api_username",
-            display_name="Data API 用户名",
+            display_name="Data API username",
             value="",
             advanced=True,
-            info="仅 hcd 环境需要（如 cassandra）。",
+            info="Required for hcd only (e.g. cassandra).",
         ),
         SecretStrInput(
             name="data_api_password",
-            display_name="Data API 密码",
+            display_name="Data API password",
             advanced=True,
-            info="仅 hcd 环境需要。",
+            info="Required for hcd only.",
         ),
         StrInput(
             name="keyspace",
@@ -88,69 +91,69 @@ class GraphRAGKBInstanceComponent(Component):
         ),
         MessageTextInput(
             name="arango_url",
-            display_name="ArangoDB 地址",
+            display_name="ArangoDB URL",
             value="http://localhost:8529",
-            info="仅 ArangoDB 需要。",
+            info="Required for ArangoDB.",
         ),
         StrInput(
             name="arango_username",
-            display_name="ArangoDB 用户名",
+            display_name="ArangoDB username",
             value="root",
         ),
         SecretStrInput(
             name="arango_password",
-            display_name="ArangoDB 密码",
+            display_name="ArangoDB password",
         ),
         StrInput(
             name="arango_database",
-            display_name="ArangoDB 数据库",
+            display_name="ArangoDB database",
             value="_system",
         ),
         StrInput(
             name="graph_name",
-            display_name="Arango 图名称",
+            display_name="Arango graph name",
             value="",
             advanced=True,
-            info="留空则自动使用「前缀名_kg_graph」。",
+            info="Leave empty to use `{prefix}_kg_graph` automatically.",
         ),
         BoolInput(
             name="use_vector_index",
-            display_name="启用向量库 ANN 检索",
+            display_name="Enable vector ANN retrieval",
             value=True,
             info=(
-                "默认开启。Astra 使用 `$vector` 近似检索；"
-                "Arango 创建 Faiss 向量索引（可用 IVF+HNSW factory）并用 AQL 近似检索。"
-                "失败时默认回退精确余弦，避免检索直接中断。"
+                "On by default. Astra uses `$vector` ANN; Arango creates Faiss vector indexes "
+                "(IVF+HNSW factory supported) and uses approximate AQL search. "
+                "On failure, exact cosine fallback is used by default so retrieve does not hard-fail."
             ),
         ),
         BoolInput(
             name="ann_fallback_exact",
-            display_name="ANN 失败回退精确余弦",
+            display_name="Fall back to exact cosine if ANN fails",
             value=True,
             advanced=True,
-            info="关闭后：向量索引/检索失败会直接报错，便于排查环境。",
+            info="If off, vector index/search failures raise immediately (useful for debugging).",
         ),
         StrInput(
             name="vector_index_factory",
-            display_name="Arango 向量索引 Factory",
+            display_name="Arango vector index factory",
             value="IVF100_HNSW10,Flat",
             advanced=True,
             info=(
-                "仅 Arango。Faiss factory，默认 IVF+HNSW。"
-                "系统会按文档数自动改写 IVF 基数，避免小库建索引失败。"
+                "Arango only. Faiss factory string (default IVF+HNSW). "
+                "IVF list count is auto-adjusted for small corpora."
             ),
         ),
         StrInput(
             name="metric",
-            display_name="向量相似度",
+            display_name="Vector similarity",
             value="cosine",
             advanced=True,
-            info="cosine（推荐）/ l2 / innerProduct（Arango）或等价 Astra 度量。",
+            info="cosine (recommended) / l2 / innerProduct (Arango) or the Astra equivalent.",
         ),
     ]
 
     outputs = [
-        Output(display_name="知识库实例", name="kb_instance", method="build_kb"),
+        Output(display_name="KB instance", name="kb_instance", method="build_kb"),
     ]
 
     def build_kb(self) -> Data:
@@ -185,27 +188,31 @@ class GraphRAGKBInstanceComponent(Component):
                 if index.entities or index.text_units:
                     kb.status = "ready"
                     ann = (
-                        "向量ANN=开（Astra `$vector` / Arango Faiss）"
+                        "vector ANN=on (Astra `$vector` / Arango Faiss)"
                         if kb.use_vector_index
-                        else "向量ANN=关（精确余弦）"
+                        else "vector ANN=off (exact cosine)"
                     )
                     kb.message = (
-                        f"已连接 GraphRAG 知识库「{kb.name}」[{kb.backend}]："
-                        f"文本单元 {len(index.text_units)}，实体 {len(index.entities)}，"
-                        f"关系 {len(index.relationships)}，社区 {len(index.communities)}，"
-                        f"报告 {len(index.community_reports)}；{ann}。"
+                        f"Connected GraphRAG KB 「{kb.name}」[{kb.backend}]: "
+                        f"text units {len(index.text_units)}, entities {len(index.entities)}, "
+                        f"relationships {len(index.relationships)}, communities {len(index.communities)}, "
+                        f"reports {len(index.community_reports)}; {ann}."
                     )
                 else:
                     kb.status = "empty"
                     kb.message = (
-                        f"已连接 GraphRAG 知识库「{kb.name}」，尚未建图，请运行「入库建图」。"
+                        f"Connected GraphRAG KB 「{kb.name}」 with no graph yet. "
+                        "Run GraphRAG Index Builder next."
                     )
             except Exception:
                 kb.status = "empty"
-                kb.message = f"已初始化 GraphRAG 存储骨架「{kb.collection_name}」，可开始入库建图。"
+                kb.message = (
+                    f"Initialized GraphRAG storage skeleton 「{kb.collection_name}」. "
+                    "Ready for indexing."
+                )
         except Exception as e:
             kb.status = "error"
-            kb.message = f"连接 GraphRAG 知识库失败：{e}"
+            kb.message = f"Failed to connect GraphRAG KB: {e}"
             self.status = kb.message
             raise ValueError(kb.message) from e
 

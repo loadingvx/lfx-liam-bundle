@@ -46,13 +46,16 @@ def run_indexing_pipeline(
 
     if llm is None:
         msg = (
-            "建图需要连接 LLM。"
-            "标准模式：实体/关系抽取、Gleaning、社区报告；"
-            "FastGraphRAG：实体由 NLP 抽取，但仍需 LLM 生成社区报告。"
+            "Indexing requires an LLM. "
+            "Standard: entity/relationship extract, gleaning, community reports; "
+            "FastGraphRAG: NLP extract, but community reports still need an LLM."
         )
         raise ValueError(msg)
     if embedding is None:
-        msg = "建图需要 Embedding 模型（TextUnit / 实体描述 / 社区报告向量化）。"
+        msg = (
+            "Indexing requires an Embedding model "
+            "(TextUnit / entity description / community report vectors)."
+        )
         raise ValueError(msg)
 
     documents = coerce_documents(ingest_data)
@@ -63,7 +66,7 @@ def run_indexing_pipeline(
         chunk_enabled=chunk_enabled,
     )
     if not units:
-        msg = "没有可索引的文本单元。请检查上游文档是否包含有效文本。"
+        msg = "No indexable text units. Check that upstream documents contain valid text."
         raise ValueError(msg)
 
     if method == "fast":
@@ -125,7 +128,7 @@ def run_indexing_pipeline(
                 level=0,
                 parent=None,
                 entity_ids=[e.id for e in incoming.entities],
-                title="全域社区",
+                title="Global community",
             )
         ]
         for e in incoming.entities:
@@ -156,20 +159,21 @@ def run_indexing_pipeline(
     kb.status = "ready"
     ann_state = persist_stats.get("vector_ann", "disabled")
     ann_note = {
-        "ready": "向量ANN=就绪",
-        "failed": "向量ANN=失败(将回退精确余弦)",
-        "disabled": "向量ANN=关闭",
-    }.get(str(ann_state), f"向量ANN={ann_state}")
+        "ready": "vector ANN=ready",
+        "failed": "vector ANN=failed (will fall back to exact cosine)",
+        "disabled": "vector ANN=off",
+    }.get(str(ann_state), f"vector ANN={ann_state}")
     if persist_stats.get("vector_ann_warning"):
-        ann_note = f"{ann_note}；{persist_stats['vector_ann_warning']}"
-    method_label = "FastGraphRAG" if method == "fast" else "标准GraphRAG"
+        ann_note = f"{ann_note}; {persist_stats['vector_ann_warning']}"
+    method_label = "FastGraphRAG" if method == "fast" else "Standard GraphRAG"
     kb.message = (
-        f"{method_label} 索引完成：文本单元 {len(index.text_units)}，实体 {len(index.entities)}，"
-        f"关系 {len(index.relationships)}，社区 {len(communities)}，报告 {len(reports)}"
-        + (f"，声明 {len(index.covariates)}" if index.covariates else "")
-        + f"；社区算法={community_stats.get('algorithm')}；"
-        f"溯源实体 {provenance_stats.get('entities_with_sources', 0)}/{len(index.entities)}；"
-        f"{ann_note}。"
+        f"{method_label} indexing complete: text units {len(index.text_units)}, "
+        f"entities {len(index.entities)}, relationships {len(index.relationships)}, "
+        f"communities {len(communities)}, reports {len(reports)}"
+        + (f", claims {len(index.covariates)}" if index.covariates else "")
+        + f"; community algorithm={community_stats.get('algorithm')}; "
+        f"entities with provenance {provenance_stats.get('entities_with_sources', 0)}/"
+        f"{len(index.entities)}; {ann_note}."
     )
     summary = {
         "message": kb.message,

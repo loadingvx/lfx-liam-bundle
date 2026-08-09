@@ -1,34 +1,33 @@
-# 工具包总览
+# Toolkit overview
 
-## 定位
+## Positioning
 
-`lfx-liam-bundle` 是个人 **Langflow Extension 工具包**，不是单一功能产品。  
-当前已提供一组 GraphRAG 控件；后续其它能力也应挂在同一 bundle `liam` 下。
+`lfx-liam-bundle` is a personal **Langflow Extension toolkit**, not a single-feature product.  
+It currently ships GraphRAG components; further capabilities should join the same `liam` bundle.
 
-## 架构
+## Architecture
 
 ```text
-langflow.extensions 入口
+langflow.extensions entry-point
   └─ lfx_liam_bundle / extension.json
-       ├─ bundle：liam
-       │    └─ components/liam/*      # Langflow 界面控件
-       └─ 领域包（如 graphrag/*）     # 控件背后的可复用逻辑
+       ├─ components/liam/*      # Langflow UI components
+       └─ domain packages (e.g. graphrag/*)
 ```
 
-| 层级 | 路径 | 职责 |
-|------|------|------|
-| 扩展清单 | `extension.json` | 扩展 id、展示名、bundle 注册 |
-| 控件层 | `src/lfx_liam_bundle/components/liam/` | 参数、校验、中文提示、接线 |
-| 领域层 | `src/lfx_liam_bundle/graphrag/` 等 | 与 UI 解耦的业务实现 |
+| Layer | Path | Role |
+|-------|------|------|
+| Extension manifest | `extension.json` | Extension id, display name, bundle registration |
+| Components | `src/lfx_liam_bundle/components/liam/` | Parameters, validation, English UI copy, wiring |
+| Domain | `src/lfx_liam_bundle/graphrag/` etc. | Reusable logic decoupled from UI |
 
-## 扩展新组件时
+## Adding a component
 
-1. 在 `components/liam/` 新增组件类并导出。  
-2. 在 `docs/components/` 写说明，并更新 [index.md](index.md) 表格。  
-3. 复杂逻辑抽到独立领域包，避免所有功能都塞进 GraphRAG。
+1. Add and export a component class under `components/liam/`.  
+2. Write a page under `docs/components/` and update [index.md](index.md).  
+3. Keep complex logic in a domain package; do not force every feature into GraphRAG.
 
-## 相关文档
+## Related
 
-- 组件列表：[index.md](index.md)  
-- 安装：[guides/install.md](guides/install.md)  
-- 最短 Flow：[guides/quickstart.md](guides/quickstart.md)
+- Component list: [index.md](index.md)  
+- Install: [guides/install.md](guides/install.md)  
+- Quickstart: [guides/quickstart.md](guides/quickstart.md)

@@ -9,14 +9,14 @@ from typing import Any
 
 def invoke_llm(llm: Any, prompt: str) -> str:
     if llm is None:
-        msg = "未连接语言模型（LLM）。完整 GraphRAG 建图/Global Search 需要 LLM。"
+        msg = "No language model (LLM) connected. Full GraphRAG indexing / Global Search needs an LLM."
         raise ValueError(msg)
     if hasattr(llm, "invoke"):
         result = llm.invoke(prompt)
     elif callable(llm):
         result = llm(prompt)
     else:
-        msg = "提供的 LLM 对象不可调用（需要支持 invoke）。"
+        msg = "Provided LLM object is not callable (must support invoke)."
         raise TypeError(msg)
     content = getattr(result, "content", result)
     if isinstance(content, list):
@@ -31,7 +31,7 @@ def invoke_llm(llm: Any, prompt: str) -> str:
 def parse_json_payload(text: str) -> Any:
     raw = (text or "").strip()
     if not raw:
-        msg = "LLM 返回为空，无法解析 JSON。"
+        msg = "LLM returned empty output; cannot parse JSON."
         raise ValueError(msg)
     # fenced code
     fence = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
@@ -48,5 +48,5 @@ def parse_json_payload(text: str) -> Any:
                     return json.loads(m.group(0))
                 except json.JSONDecodeError:
                     continue
-        msg = f"无法从 LLM 输出解析 JSON：{raw[:200]}"
+        msg = f"Could not parse JSON from LLM output: {raw[:200]}"
         raise ValueError(msg) from None

@@ -1,62 +1,62 @@
-# GraphRAG 入库建图
+# GraphRAG Index Builder
 
-| 项 | 值 |
-|----|-----|
-| 界面名称 | GraphRAG 入库建图 |
-| 内部名称 | `LiamGraphRAGBuild` |
-| 源码 | `components/liam/kb_build.py` |
-| 作用 | 将文档写入知识模型：切块、抽图、社区、报告、向量与 ANN |
+| Item | Value |
+|------|-------|
+| Display name | GraphRAG Index Builder |
+| Internal name | `LiamGraphRAGBuild` |
+| Source | `components/liam/kb_build.py` |
+| Role | Index documents: chunk → extract → communities → reports → vectors / ANN |
 
-## 用途
+## Purpose
 
-对「GraphRAG 知识库」实例执行完整索引流水线。支持两种建图模式：
+Run the full indexing pipeline on a **GraphRAG Knowledge Base** instance. Two methods:
 
-- **标准 GraphRAG**：LLM 抽取实体/关系 + Gleaning（质量高、更贵）  
-- **FastGraphRAG**：NLP 名词短语 + 共现（更快更便宜，图更噪，适合偏摘要）
+- **Standard GraphRAG**: LLM entities/relationships + gleaning (higher quality, costlier)  
+- **FastGraphRAG**: NLP noun phrases + co-occurrence (faster/cheaper, noisier; fine for Global-style summaries)
 
-随后做 Leiden 社区 → 社区报告 → 向量落库与 ANN 索引。
+Then Leiden communities → community reports → embeddings and ANN indexes.
 
-## 主要输入
+## Main inputs
 
-| 参数 | 说明 |
-|------|------|
-| 知识库实例 | 连接「GraphRAG 知识库」输出 |
-| 待入库文档 | `Data` / `DataFrame` / `Table` 列表 |
-| Embedding 模型 | 必需；用于 TextUnit / 实体 / 报告向量化 |
-| 语言模型 LLM | 必需；标准模式做抽取与报告，Fast 模式仍需写社区报告 |
-| 建图模式 | 标准 GraphRAG / FastGraphRAG |
-| 启用内置 token 切块 | 默认开；关闭则每条输入当作一个 TextUnit |
-| 切块大小 / 重叠 | 默认约 1200 / 100 tokens |
-| Gleaning 轮数 | 仅标准模式有效，建议 `1` |
-| 抽取事实声明 Claims | 默认关；仅标准模式 |
-| 社区最大规模 / 层数 | Leiden 相关高级参数 |
-| 实体类型 | 标准模式抽取类型列表 |
-| 写入模式 | 重建索引 / 追加合并 |
+| Parameter | Notes |
+|-----------|-------|
+| KB instance | Output of GraphRAG Knowledge Base |
+| Documents to index | `Data` / `DataFrame` / `Table` list |
+| Embedding model | Required for TextUnit / entity / report vectors |
+| Language model (LLM) | Required; Standard extract + reports; Fast still needs reports |
+| Indexing method | Standard GraphRAG / FastGraphRAG |
+| Enable built-in token chunking | Default on; off → each item is one TextUnit |
+| Chunk size / overlap | Defaults ~1200 / 100 tokens |
+| Gleaning rounds | Standard only; `1` is a good start |
+| Extract claims | Default off; Standard only |
+| Max community size / levels | Leiden advanced knobs |
+| Entity types | Comma-separated types for Standard extract |
+| Write mode | Rebuild index / Append merge |
 
-## 输出
+## Outputs
 
-| 输出 | 说明 |
-|------|------|
-| 知识库实例 | 建图后的同一实例（可继续接检索） |
-| 建库汇总 | 文本单元、实体、社区、ANN 状态等摘要 |
+| Output | Notes |
+|--------|-------|
+| KB instance | Same instance after indexing (wire to Retrieve) |
+| Build summary | Counts, ANN state, etc. |
 
-## 典型接线
+## Typical wiring
 
 ```text
-[文档源] ──┐
-[Embedding]┤
-[LLM] ─────┼→ [GraphRAG 入库建图] → [GraphRAG 检索]
-[知识库] ──┘
+[Documents] ──┐
+[Embedding] ──┤
+[LLM] ────────┼→ [GraphRAG Index Builder] → [GraphRAG Retrieve]
+[KB] ─────────┘
 ```
 
-## 注意点
+## Notes
 
-- 开启或修复 Arango 向量功能后，建议先做一次**重建索引**。  
-- 汇总里应看到实体/社区/报告数量，并提示向量 ANN 就绪。  
-- FastGraphRAG 对极短、无词组文本可能抽不到实体，可换更长文本或改用标准模式。
+- After enabling or fixing Arango vectors, prefer **Rebuild index** once.  
+- Summary should show entity/community/report counts and vector ANN ready.  
+- FastGraphRAG may extract nothing from tiny / phrase-poor text—use longer text or Standard.
 
-## 相关文档
+## Related
 
-- [知识库](graphrag-kb.md)  
-- [检索](graphrag-retrieve.md)  
-- [最短 Flow](../guides/quickstart.md)
+- [Knowledge Base](graphrag-kb.md)  
+- [Retrieve](graphrag-retrieve.md)  
+- [Quickstart](../guides/quickstart.md)

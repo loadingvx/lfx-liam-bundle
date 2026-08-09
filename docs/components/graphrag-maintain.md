@@ -1,45 +1,45 @@
-# GraphRAG 知识库维护
+# GraphRAG Maintain
 
-| 项 | 值 |
-|----|-----|
-| 界面名称 | GraphRAG 知识库维护 |
-| 内部名称 | `LiamGraphRAGMaintain` |
-| 源码 | `components/liam/kb_maintain.py` |
-| 作用 | 查看知识模型规模，或清空知识库（危险操作） |
+| Item | Value |
+|------|-------|
+| Display name | GraphRAG Maintain |
+| Internal name | `LiamGraphRAGMaintain` |
+| Source | `components/liam/kb_maintain.py` |
+| Role | Show knowledge-model stats, or clear the KB (destructive) |
 
-## 用途
+## Purpose
 
-- **统计**：查看文本单元、实体、关系、社区、报告等数量。  
-- **清空知识库**：删除该前缀下的 GraphRAG 数据（不可恢复）。
+- **Stats**: text units, entities, relationships, communities, reports, claims.  
+- **Clear knowledge base**: delete GraphRAG data under the prefix (irreversible).
 
-## 主要输入
+## Main inputs
 
-| 参数 | 说明 |
-|------|------|
-| 知识库实例 | 目标实例 |
-| 操作 | `统计` / `清空知识库` |
-| 清空确认语 | 清空时必须精确输入：`确认清空` |
+| Parameter | Notes |
+|-----------|-------|
+| KB instance | Target instance |
+| Operation | `Stats` / `Clear knowledge base` |
+| Clear confirmation phrase | For clear, type exactly: `CONFIRM DELETE` |
 
-## 输出
+## Outputs
 
-| 输出 | 说明 |
-|------|------|
-| 知识库实例 | 操作后的实例 |
-| 操作结果 | 统计信息或清空结果说明 |
+| Output | Notes |
+|--------|-------|
+| KB instance | Instance after the operation |
+| Operation result | Stats or clear result message |
 
-## 典型接线
+## Typical wiring
 
 ```text
-[GraphRAG 知识库] → [GraphRAG 知识库维护] → 操作结果
+[GraphRAG Knowledge Base] → [GraphRAG Maintain] → operation result
 ```
 
-## 注意点
+## Notes
 
-- 清空是破坏性操作，确认语必须完全一致：`确认清空`。  
-- 清空后需重新「入库建图」才能检索。  
-- 确认前缀正确，避免清空到其它业务库。
+- Clear is destructive; the confirmation phrase must match exactly: `CONFIRM DELETE`.  
+- After clear, run Index Builder again before retrieve.  
+- Double-check the prefix so you do not wipe another dataset.
 
-## 相关文档
+## Related
 
-- [知识库](graphrag-kb.md)  
-- [入库建图](graphrag-build.md)
+- [Knowledge Base](graphrag-kb.md)  
+- [Index Builder](graphrag-build.md)
