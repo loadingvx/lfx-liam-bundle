@@ -6,4 +6,4 @@ from lfx_liam_bundle.graphrag.retrieve import SEARCH_MODES
 
 
 def test_search_modes() -> None:
-    assert SEARCH_MODES == ["Local Search", "Global Search"]
+    assert SEARCH_MODES == ["Local Search", "Global Search", "DRIFT Search"]

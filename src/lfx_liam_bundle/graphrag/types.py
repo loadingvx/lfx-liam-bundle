@@ -22,19 +22,29 @@ class GraphRAGKnowledgeBase:
     status: Status = "empty"
     message: str = "知识库已连接，尚未入库。"
     document_count: int = 0
-    # Astra
+    # Astra / 本地 Data API (HCD)
     api_endpoint: str = ""
     token: str = ""
     keyspace: str = "default_keyspace"
+    # astra=云上 AstraDB；hcd=本地/自建 Data API（用户名密码）
+    data_api_environment: Literal["astra", "hcd"] = "astra"
+    data_api_username: str = ""
+    data_api_password: str = ""
     # Arango
     arango_url: str = ""
     arango_username: str = "root"
     arango_password: str = ""
     arango_database: str = "_system"
     graph_name: str = ""
-    # Optional
+    # Vector ANN
     embedding_dim: int | None = None
     metric: str = "cosine"
+    use_vector_index: bool = True
+    # Arango Faiss factory 模板；实际 IVF 基数会按文档数自动收缩
+    vector_index_factory: str = "IVF100_HNSW10,Flat"
+    vector_n_lists: int | None = None
+    # ANN 失败时是否回退进程内精确余弦（建议保持开启，避免检索直接报错）
+    ann_fallback_exact: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
@@ -84,4 +94,10 @@ class GraphRAGKnowledgeBase:
             "arango_database": self.arango_database if self.backend == "arangodb" else None,
             "api_endpoint": self.api_endpoint if self.backend == "astradb" else None,
             "arango_url": self.arango_url if self.backend == "arangodb" else None,
+            "use_vector_index": self.use_vector_index,
+            "embedding_dim": self.embedding_dim,
+            "metric": self.metric,
+            "vector_index_factory": self.vector_index_factory
+            if self.backend == "arangodb"
+            else None,
         }

@@ -18,7 +18,7 @@ from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
 
 def test_search_modes_are_local_global() -> None:
-    assert SEARCH_MODES == ["Local Search", "Global Search"]
+    assert SEARCH_MODES == ["Local Search", "Global Search", "DRIFT Search"]
 
 
 def test_merge_graph_primitives_dedupes() -> None:
@@ -55,19 +55,19 @@ def test_hierarchical_communities_and_ranks() -> None:
         Relationship(id="r3", source="C", target="D", weight=1),
         Relationship(id="r4", source="A", target="C", weight=1),
     ]
-    communities = detect_hierarchical_communities(
+    communities, stats = detect_hierarchical_communities(
         entities, relationships, max_cluster_size=2, max_levels=3
     )
     assert communities
+    assert stats.get("algorithm") in {"hierarchical_leiden", "hierarchical_louvain"}
     assert any(c.level == 0 for c in communities)
     assert all(e.rank >= 0 for e in entities)
     assert any(e.community_ids for e in entities)
 
 
 def test_parse_community_report() -> None:
-    title, summary, full = _parse_report("标题：测试社区\n摘要：这是摘要\n报告：第一点\n第二点")
+    title, full = _parse_report("标题：测试社区\n报告：第一点\n第二点")
     assert title == "测试社区"
-    assert "摘要" in summary or summary == "这是摘要"
     assert "第一点" in full
 
 

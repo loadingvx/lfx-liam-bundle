@@ -22,4 +22,4 @@
 ## 版本与清单
 
 - [ ] 无需 bump 版本
-- [ ] 已同步：`pyproject.toml` / 两份 `extension.json` / `__version__` / `CHANGELOG.md`
+- [ ] 已 bump：`./scripts/bump-version.sh X.Y.Z`（或手改 `pyproject` + 两份 `extension.json`）并更新 `CHANGELOG.md`

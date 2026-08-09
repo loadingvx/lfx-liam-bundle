@@ -1,70 +1,24 @@
-"""完整 GraphRAG 索引流水线（对齐微软默认 dataflow Phase 1/3/4/5/6）。
-
-流程：
-Documents → TextUnits → Extract(+Gleaning) → Summarize → Claims(可选)
-→ Hierarchical Communities → Community Reports → Embeddings → Persist
-"""
+"""完整 GraphRAG 索引流水线（标准 / FastGraphRAG）。"""
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
+from lfx_liam_bundle.graphrag.chunking import DEFAULT_CHUNK_OVERLAP, DEFAULT_CHUNK_SIZE, compose_text_units
 from lfx_liam_bundle.graphrag.claims import extract_claims_from_units
 from lfx_liam_bundle.graphrag.communities import detect_hierarchical_communities
 from lfx_liam_bundle.graphrag.community_reports import generate_community_reports
-from lfx_liam_bundle.graphrag.edges import coerce_documents, stable_doc_id
+from lfx_liam_bundle.graphrag.edges import coerce_documents
 from lfx_liam_bundle.graphrag.extract_graph import DEFAULT_ENTITY_TYPES, extract_graph_from_units
+from lfx_liam_bundle.graphrag.fast_extract import extract_graph_fast
 from lfx_liam_bundle.graphrag.kg_store import load_index, persist_index
-from lfx_liam_bundle.graphrag.models import (
-    Community,
-    DocumentRecord,
-    GraphIndex,
-    TextUnit,
-    merge_graph_indexes,
-)
+from lfx_liam_bundle.graphrag.models import Community, GraphIndex, merge_graph_indexes
 from lfx_liam_bundle.graphrag.provenance import link_provenance
 from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
-
-def documents_to_text_units(
-    documents: list[Document],
-) -> tuple[list[TextUnit], list[DocumentRecord]]:
-    units: list[TextUnit] = []
-    doc_records: dict[str, DocumentRecord] = {}
-    for doc in documents:
-        text = (doc.page_content or "").strip()
-        if not text:
-            continue
-        meta = dict(doc.metadata or {})
-        uid = str(doc.id or meta.get("doc_id") or stable_doc_id(text, meta))
-        parent_doc_id = str(meta.get("document_id") or meta.get("source") or uid)
-        doc_title = str(meta.get("title") or meta.get("filename") or meta.get("source") or parent_doc_id)
-        meta["doc_id"] = uid
-        units.append(
-            TextUnit(
-                id=uid,
-                text=text,
-                metadata=meta,
-                document_id=parent_doc_id,
-                n_tokens=max(1, len(text) if any("\u4e00" <= ch <= "\u9fff" for ch in text) else len(text.split())),
-            )
-        )
-        rec = doc_records.get(parent_doc_id)
-        if rec is None:
-            rec = DocumentRecord(
-                id=parent_doc_id,
-                title=doc_title,
-                text=text[:500],
-                text_unit_ids=[],
-                metadata=meta,
-            )
-            doc_records[parent_doc_id] = rec
-        if uid not in rec.text_unit_ids:
-            rec.text_unit_ids.append(uid)
-    return units, list(doc_records.values())
+IndexingMethod = Literal["standard", "fast"]
 
 
 def run_indexing_pipeline(
@@ -79,38 +33,67 @@ def run_indexing_pipeline(
     entity_types: list[str] | None = None,
     replace: bool = True,
     extract_claims: bool = False,
+    chunk_enabled: bool = True,
+    chunk_size: int = DEFAULT_CHUNK_SIZE,
+    chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
+    indexing_method: IndexingMethod | str = "standard",
 ) -> tuple[GraphRAGKnowledgeBase, GraphIndex, dict[str, Any]]:
-    """执行完整 Microsoft-compatible GraphRAG 索引。"""
+    method = (indexing_method or "standard").strip().lower()
+    if method in {"fast", "fastgraphrag", "fast_graphrag", "快速", "快速建图"}:
+        method = "fast"
+    else:
+        method = "standard"
+
     if llm is None:
         msg = (
-            "完整 GraphRAG 建图需要连接 LLM（实体/关系抽取、Data Gleaning、社区报告）。"
-            "请在「入库建图」组件连接语言模型。"
+            "建图需要连接 LLM。"
+            "标准模式：实体/关系抽取、Gleaning、社区报告；"
+            "FastGraphRAG：实体由 NLP 抽取，但仍需 LLM 生成社区报告。"
         )
         raise ValueError(msg)
     if embedding is None:
-        msg = (
-            "完整 GraphRAG 需要 Embedding 模型"
-            "（TextUnit / 实体描述 / 社区报告向量化，供 Local Search 使用）。"
-        )
+        msg = "建图需要 Embedding 模型（TextUnit / 实体描述 / 社区报告向量化）。"
         raise ValueError(msg)
 
     documents = coerce_documents(ingest_data)
-    units, doc_records = documents_to_text_units(documents)
+    units, doc_records, chunk_stats = compose_text_units(
+        documents,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        chunk_enabled=chunk_enabled,
+    )
     if not units:
-        msg = "没有可索引的文本单元。请检查上游文档是否包含有效文本（不能全为空）。"
+        msg = "没有可索引的文本单元。请检查上游文档是否包含有效文本。"
         raise ValueError(msg)
 
-    entities, relationships, extract_stats = extract_graph_from_units(
-        llm,
-        units,
-        entity_types=entity_types or DEFAULT_ENTITY_TYPES,
-        max_gleanings=max_gleanings,
-    )
-
-    covariates = []
-    if extract_claims:
-        covariates = extract_claims_from_units(llm, units)
-        extract_stats["covariates"] = len(covariates)
+    if method == "fast":
+        entities, relationships, extract_stats = extract_graph_fast(units)
+        covariates: list = []
+        extract_stats["claims"] = 0
+        extract_phases = [
+            "compose_text_units_token_chunking",
+            "link_documents_text_units",
+            "fast_nlp_entity_cooccurrence",
+            "claim_extraction_skipped",
+        ]
+    else:
+        entities, relationships, extract_stats = extract_graph_from_units(
+            llm,
+            units,
+            entity_types=entity_types or DEFAULT_ENTITY_TYPES,
+            max_gleanings=max_gleanings,
+        )
+        covariates = []
+        if extract_claims:
+            covariates = extract_claims_from_units(llm, units)
+            extract_stats["covariates"] = len(covariates)
+        extract_phases = [
+            "compose_text_units_token_chunking",
+            "link_documents_text_units",
+            "extract_entities_relationships_gleaning",
+            "summarize_descriptions",
+            "claim_extraction" if extract_claims else "claim_extraction_skipped",
+        ]
 
     incoming = GraphIndex(
         text_units=units,
@@ -129,7 +112,7 @@ def run_indexing_pipeline(
         except Exception:
             extract_stats["merged_with_existing"] = False
 
-    communities = detect_hierarchical_communities(
+    communities, community_stats = detect_hierarchical_communities(
         incoming.entities,
         incoming.relationships,
         max_cluster_size=max_cluster_size,
@@ -147,6 +130,7 @@ def run_indexing_pipeline(
         ]
         for e in incoming.entities:
             e.community_ids = ["comm_L0_0"]
+        community_stats = {"algorithm": "singleton_fallback", "communities": 1}
 
     reports = generate_community_reports(
         llm,
@@ -154,6 +138,7 @@ def run_indexing_pipeline(
         incoming.entities,
         incoming.relationships,
         covariates=incoming.covariates,
+        text_units=incoming.text_units if method == "fast" else None,
     )
     index = GraphIndex(
         text_units=incoming.text_units,
@@ -164,41 +149,46 @@ def run_indexing_pipeline(
         covariates=incoming.covariates,
         documents=incoming.documents,
     )
-    # 双向溯源：Entity↔TextUnit↔Document（论文 provenance / breadcrumbs）
     provenance_stats = link_provenance(index)
-    # 追加模式也整库重写社区/报告（图结构已合并），保证一致性
     persist_stats = persist_index(kb, index, embedding, replace=True)
 
     kb.document_count = len(index.text_units)
     kb.status = "ready"
-    orphan_e = provenance_stats.get("orphan_entities", 0)
+    ann_state = persist_stats.get("vector_ann", "disabled")
+    ann_note = {
+        "ready": "向量ANN=就绪",
+        "failed": "向量ANN=失败(将回退精确余弦)",
+        "disabled": "向量ANN=关闭",
+    }.get(str(ann_state), f"向量ANN={ann_state}")
+    if persist_stats.get("vector_ann_warning"):
+        ann_note = f"{ann_note}；{persist_stats['vector_ann_warning']}"
+    method_label = "FastGraphRAG" if method == "fast" else "标准GraphRAG"
     kb.message = (
-        f"GraphRAG 索引完成：文本单元 {len(index.text_units)}，实体 {len(index.entities)}，"
+        f"{method_label} 索引完成：文本单元 {len(index.text_units)}，实体 {len(index.entities)}，"
         f"关系 {len(index.relationships)}，社区 {len(communities)}，报告 {len(reports)}"
         + (f"，声明 {len(index.covariates)}" if index.covariates else "")
-        + f"；溯源已链接（有原文的实体 {provenance_stats.get('entities_with_sources', 0)}/"
-        f"{len(index.entities)}）。"
+        + f"；社区算法={community_stats.get('algorithm')}；"
+        f"溯源实体 {provenance_stats.get('entities_with_sources', 0)}/{len(index.entities)}；"
+        f"{ann_note}。"
     )
-    if orphan_e:
-        kb.message += f" 注意：{orphan_e} 个实体缺少原文链接。"
     summary = {
         "message": kb.message,
+        "indexing_method": method,
+        "chunk": chunk_stats,
         "extract": extract_stats,
+        "communities": community_stats,
         "index": index.stats(),
         "provenance": provenance_stats,
         "persist": persist_stats,
-        "pipeline": "microsoft_graphrag_compatible_v1",
+        "pipeline": "microsoft_graphrag_compatible_v3",
         "phases": [
-            "compose_text_units",
-            "link_documents_text_units",
-            "extract_entities_relationships_gleaning",
-            "summarize_descriptions",
-            "claim_extraction" if extract_claims else "claim_extraction_skipped",
+            *extract_phases,
             "hierarchical_community_detection",
-            "community_reports",
+            "community_reports_generate_and_summarize",
             "link_provenance_bidirectional",
             "text_embeddings",
             "persist_knowledge_model",
+            "ensure_vector_indexes",
         ],
     }
     return kb, index, summary

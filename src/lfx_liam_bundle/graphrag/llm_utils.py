@@ -21,7 +21,11 @@ def invoke_llm(llm: Any, prompt: str) -> str:
     content = getattr(result, "content", result)
     if isinstance(content, list):
         content = "".join(str(getattr(c, "text", c)) for c in content)
-    return str(content).strip()
+    text = str(content).strip()
+    # MiniMax 等模型可能返回 <think>…</think>，下游 JSON/答案解析前去掉
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text, flags=re.I).strip()
+    text = re.sub(r"<thinking>[\s\S]*?</thinking>", "", text, flags=re.I).strip()
+    return text
 
 
 def parse_json_payload(text: str) -> Any:

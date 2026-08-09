@@ -1,30 +1,10 @@
-"""分层社区检测（Hierarchical Louvain，对齐 GraphRAG 分层社区思想）。
-
-微软默认用 Hierarchical Leiden（graspologic）；为避免重型原生依赖，
-此处用 networkx Louvain 做递归分层，产出多 level 社区供 Global/Local Search。
-
-语义：
-- level 0 = 最粗分区（Louvain 对全图的结果）
-- 更大 level = 更细子社区
-- 每个社区可有 parent/children，供 Global Search 动态社区选择
-"""
+"""分层社区检测：优先 Hierarchical Leiden（leidenalg），失败则 Louvain。"""
 
 from __future__ import annotations
 
+from typing import Any
+
 from lfx_liam_bundle.graphrag.models import Community, Entity, Relationship
-
-
-def _require_networkx():
-    try:
-        import networkx as nx
-        from networkx.algorithms.community import louvain_communities
-    except ImportError as e:
-        msg = (
-            "缺少 networkx（分层社区检测依赖）。"
-            f"请安装：pip install 'networkx>=3.2'（原始错误：{e}）"
-        )
-        raise ImportError(msg) from e
-    return nx, louvain_communities
 
 
 def _norm(title: str) -> str:
@@ -32,7 +12,8 @@ def _norm(title: str) -> str:
 
 
 def build_entity_graph(entities: list[Entity], relationships: list[Relationship]):
-    nx, _ = _require_networkx()
+    import networkx as nx
+
     g = nx.Graph()
     title_to_id = {_norm(e.title): e.id for e in entities}
     for e in entities:
@@ -51,11 +32,59 @@ def build_entity_graph(entities: list[Entity], relationships: list[Relationship]
 
 
 def apply_entity_ranks(entities: list[Entity], relationships: list[Relationship]) -> None:
-    """用度数 + 出现频次估算实体重要性。"""
     g = build_entity_graph(entities, relationships)
     for e in entities:
         degree = float(g.degree(e.id, weight="weight")) if g.has_node(e.id) else 0.0
         e.rank = degree + float(len(e.text_unit_ids))
+
+
+def _nx_to_igraph(g):
+    import igraph as ig
+
+    nodes = list(g.nodes())
+    index = {n: i for i, n in enumerate(nodes)}
+    edges = [(index[u], index[v]) for u, v in g.edges()]
+    weights = [float(g[u][v].get("weight", 1.0)) for u, v in g.edges()]
+    ig_g = ig.Graph(n=len(nodes), edges=edges, directed=False)
+    if weights:
+        ig_g.es["weight"] = weights
+    return ig_g, nodes
+
+
+def _partition_leiden(sub_nodes: list[str], g) -> list[list[str]] | None:
+    try:
+        import leidenalg as la
+    except ImportError:
+        return None
+    if len(sub_nodes) <= 1:
+        return [sub_nodes]
+    sub = g.subgraph(sub_nodes).copy()
+    if sub.number_of_edges() == 0:
+        return [sub_nodes]
+    ig_g, nodes = _nx_to_igraph(sub)
+    try:
+        part = la.find_partition(
+            ig_g,
+            la.ModularityVertexPartition,
+            weights="weight" if ig_g.ecount() and "weight" in ig_g.es.attributes() else None,
+            seed=42,
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    groups: dict[int, list[str]] = {}
+    for vid, cid in enumerate(part.membership):
+        groups.setdefault(int(cid), []).append(nodes[vid])
+    return list(groups.values())
+
+
+def _partition_louvain(sub_nodes: list[str], g) -> list[list[str]]:
+    from networkx.algorithms.community import louvain_communities
+
+    sub = g.subgraph(sub_nodes).copy()
+    if sub.number_of_edges() == 0:
+        return [sub_nodes]
+    parts = [list(p) for p in louvain_communities(sub, weight="weight", seed=42)]
+    return parts or [sub_nodes]
 
 
 def detect_hierarchical_communities(
@@ -64,12 +93,20 @@ def detect_hierarchical_communities(
     *,
     max_cluster_size: int = 10,
     max_levels: int = 3,
-) -> list[Community]:
-    _nx, louvain_communities = _require_networkx()
+) -> tuple[list[Community], dict[str, Any]]:
+    """递归分层社区。优先 Leiden，否则 Louvain。"""
     g = build_entity_graph(entities, relationships)
     apply_entity_ranks(entities, relationships)
     if g.number_of_nodes() == 0:
-        return []
+        return [], {"algorithm": "none"}
+
+    try:
+        import leidenalg as _la  # noqa: F401
+        import igraph as _ig  # noqa: F401
+
+        algorithm = "hierarchical_leiden"
+    except ImportError:
+        algorithm = "hierarchical_louvain"
 
     communities: list[Community] = []
     by_id: dict[str, Community] = {}
@@ -92,18 +129,15 @@ def detect_hierarchical_communities(
     def _split(nodes: list[str], level: int, parent: str | None) -> None:
         if not nodes:
             return
-
-        # 终止：达到层数上限或规模够小
         if level >= max_levels - 1 or len(nodes) <= max_cluster_size:
             _add(nodes, level, parent)
             return
 
-        sub = g.subgraph(nodes).copy()
-        if sub.number_of_edges() == 0:
-            _add(nodes, level, parent)
-            return
+        if algorithm == "hierarchical_leiden":
+            parts = _partition_leiden(nodes, g) or [nodes]
+        else:
+            parts = _partition_louvain(nodes, g)
 
-        parts = [list(p) for p in louvain_communities(sub, weight="weight", seed=42)]
         if len(parts) <= 1:
             _add(nodes, level, parent)
             return
@@ -125,7 +159,8 @@ def detect_hierarchical_communities(
             ent = ent_by_id.get(eid)
             if ent and c.id not in ent.community_ids:
                 ent.community_ids.append(c.id)
-    return communities
+
+    return communities, {"algorithm": algorithm, "communities": len(communities)}
 
 
 def community_levels(communities: list[Community]) -> list[int]:

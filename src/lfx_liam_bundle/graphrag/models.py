@@ -69,7 +69,7 @@ class Relationship:
 
 @dataclass
 class Covariate:
-    """Claim / 事实声明（微软 GraphRAG 可选产物）。"""
+    """Claim / 事实声明（微软 GraphRAG 可选产物，可含时间界）。"""
 
     id: str
     subject: str
@@ -77,6 +77,8 @@ class Covariate:
     type: str = "claim"
     status: str = "TRUE"
     description: str = ""
+    start_date: str = ""
+    end_date: str = ""
     text_unit_ids: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:

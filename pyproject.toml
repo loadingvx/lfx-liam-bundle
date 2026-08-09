@@ -39,6 +39,9 @@ dependencies = [
     "python-arango>=8.0.0,<9.0.0",
     "langchain-core>=0.3.0",
     "networkx>=3.2",
+    "leidenalg>=0.10",
+    "igraph>=0.11",
+    "tiktoken>=0.7",
 ]
 
 [project.urls]
@@ -94,12 +97,20 @@ dev = [
     "build>=1.2.0",
     "ruff>=0.9.0",
     "pre-commit>=4.0.0",
+    "langchain-openai>=1.4.2",
+    "openai>=2.53.0",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
-addopts = ["-q", "--strict-markers"]
+pythonpath = ["src", "."]
+# 默认不跑真库集成测试；用 ./devops/test-integration.sh
+addopts = ["-q", "--strict-markers", "-m", "not integration"]
+markers = [
+    "integration: 真实数据库集成测试（需 ./devops/db-up.sh 或云凭证）",
+    "arango: 针对 ArangoDB 的集成测试",
+    "astra: 针对 Astra 云或本地 Data API(HCD) 的集成测试",
+]
 
 [tool.coverage.run]
 source = ["lfx_liam_bundle"]

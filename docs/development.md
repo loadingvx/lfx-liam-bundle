@@ -51,25 +51,35 @@ mise exec -- uv run lfx extension dev .
 4. 补 `tests/`，保证无外部 DB 也能跑的纯逻辑覆盖
 5. `make check` 通过后再提 PR
 
-## 版本 bump 清单
+## 版本 bump（尽量少改）
 
-发布前同步这些位置：
+手写版本号只保留 **3 处**（其余勿写死具体号）：
 
-- `pyproject.toml` → `project.version`
-- 根目录 `extension.json` → `version`
-- `src/lfx_liam_bundle/extension.json` → `version`
-- `src/lfx_liam_bundle/__init__.py` → `__version__`
-- `CHANGELOG.md`
+| 文件 | 字段 | 说明 |
+|------|------|------|
+| `pyproject.toml` | `project.version` | 权威源 |
+| `extension.json` | `version` | Mode A / `lfx extension validate` |
+| `src/lfx_liam_bundle/extension.json` | `version` | 打进 wheel，运行时发现 |
+
+推荐一键同步：
+
+```bash
+./scripts/bump-version.sh 0.0.2   # 改三处并校验
+# 再把 CHANGELOG.md 的 [Unreleased] 固化为对应版本
+```
+
+`__version__` 由 `importlib.metadata` 读取包装版本，**不要**在 `__init__.py` 手写字面量。  
+文档示例用 `X.Y.Z` / `pip show`，不要钉死某一版。
+
+本地校验：`make check-versions`（已纳入 `make check`）。  
+发版 CI 会再跑 `./scripts/check-versions.sh <tag>`。
 
 ## 发布期望（PyPI）
 
 GitHub Actions（`.github/workflows/python-publish.yml`）在 **Release published** 时执行：
 
-1. 校验 tag 与下列版本一致（去掉前缀 `v`）：
-   - `pyproject.toml` → `project.version`
-   - `src/lfx_liam_bundle/__init__.py` → `__version__`
-   - 根目录与包内两份 `extension.json` → `version`
+1. `./scripts/check-versions.sh <tag>`：tag（可带/不带 `v`）与上述三处一致
 2. 校验 `requires-python` 允许 3.10，并用 **Python 3.10** 执行 `python -m build`
 3. 通过 Trusted Publishing（OIDC + Environment `pypi`）上传到 PyPI：`lfx-liam-bundle`
 
-本地门禁仍用：`make check`（validate + lint + test），再 `make build`。
+本地门禁：`make check`（check-versions + validate + lint + test），再 `make build`。

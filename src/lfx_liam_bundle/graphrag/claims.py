@@ -1,7 +1,4 @@
-"""Claim / Covariate 抽取（对齐微软 GraphRAG 可选 Phase 3 claim_extraction）。
-
-默认关闭：官方也注明 claim 通常需要 prompt tuning；开启后供 Local Search 补充证据。
-"""
+"""Claim / Covariate 抽取（可选；含时间界字段）。"""
 
 from __future__ import annotations
 
@@ -12,12 +9,20 @@ from lfx_liam_bundle.graphrag.llm_utils import invoke_llm, parse_json_payload
 from lfx_liam_bundle.graphrag.models import Covariate, TextUnit
 
 CLAIM_PROMPT = """你是事实声明抽取助手。从文本中抽取可核验的事实声明（claims）。
-每条声明包含：主体(subject)、客体(object，可空)、状态(TRUE/FALSE/SUSPECTED)、描述。
+每条声明包含：主体(subject)、客体(object，可空)、状态(TRUE/FALSE/SUSPECTED)、
+描述、可选时间界 start_date/end_date（ISO 日期或原文时间短语，未知则空字符串）。
 
 严格输出 JSON：
 {{
   "claims": [
-    {{"subject": "主体", "object": "客体", "status": "TRUE", "description": "一句话事实"}}
+    {{
+      "subject": "主体",
+      "object": "客体",
+      "status": "TRUE",
+      "description": "一句话事实",
+      "start_date": "",
+      "end_date": ""
+    }}
   ]
 }}
 若没有明确事实，返回 {{"claims": []}}
@@ -29,7 +34,7 @@ CLAIM_PROMPT = """你是事实声明抽取助手。从文本中抽取可核验�
 
 def _claim_id(subject: str, description: str) -> str:
     key = f"{subject.strip().casefold()}|{description.strip().casefold()}"
-    return "cov_" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
+    return "cov_" + hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]  # noqa: S324
 
 
 def extract_claims_from_units(llm: Any, units: list[TextUnit]) -> list[Covariate]:
@@ -40,7 +45,7 @@ def extract_claims_from_units(llm: Any, units: list[TextUnit]) -> list[Covariate
         prompt = CLAIM_PROMPT.format(text=unit.text[:5000])
         try:
             payload = parse_json_payload(invoke_llm(llm, prompt))
-        except Exception:
+        except Exception:  # noqa: BLE001
             continue
         claims = payload.get("claims") if isinstance(payload, dict) else []
         if not isinstance(claims, list):
@@ -67,6 +72,8 @@ def extract_claims_from_units(llm: Any, units: list[TextUnit]) -> list[Covariate
                 type="claim",
                 status=status,
                 description=description,
+                start_date=str(c.get("start_date") or "").strip(),
+                end_date=str(c.get("end_date") or "").strip(),
                 text_unit_ids=[unit.id],
             )
     return list(bucket.values())

@@ -68,12 +68,59 @@ def persist_index(
     *,
     replace: bool = True,
 ) -> dict[str, Any]:
+    from lfx_liam_bundle.graphrag.vector_search import (
+        ensure_astra_vector_collection,
+        ensure_vector_indexes,
+        infer_embedding_dim,
+    )
+
     ensure_kg_schema(kb, create_if_missing=True)
     if embedding is not None:
         _embed_index(index, embedding)
+    dim = infer_embedding_dim(index)
+    if dim:
+        kb.embedding_dim = dim
+
+    # Astra：entities/chunks/reports 必须是向量集合，写入时附带 $vector
+    if kb.backend == "astradb" and kb.use_vector_index and dim:
+        db = _astra_db(kb)
+        names = _names(kb)
+        metric = kb.metric or "cosine"
+        for key in ("entities", "chunks", "reports"):
+            ensure_astra_vector_collection(
+                db,
+                names[key],
+                dim=dim,
+                metric=metric,
+                recreate=bool(replace),
+            )
+
     if kb.backend == "astradb":
-        return _astra_persist(kb, index, replace=replace)
-    return _arango_persist(kb, index, replace=replace)
+        stats = _astra_persist(kb, index, replace=replace)
+    else:
+        stats = _arango_persist(kb, index, replace=replace)
+
+    if kb.use_vector_index and dim:
+        try:
+            stats["vector_indexes"] = ensure_vector_indexes(
+                kb,
+                dim=dim,
+                entity_count=len(index.entities),
+                chunk_count=len(index.text_units),
+                report_count=len(index.community_reports),
+            )
+            stats["vector_ann"] = "ready"
+        except Exception as e:
+            # 入库数据已落盘；向量索引失败不吞掉，让用户立刻看见（可关 use_vector_index 或修服务器）
+            if not kb.ann_fallback_exact:
+                raise
+            stats["vector_ann"] = "failed"
+            stats["vector_ann_warning"] = (
+                f"向量索引未就绪，Local Search 将回退精确余弦：{e}"
+            )
+    else:
+        stats["vector_ann"] = "disabled"
+    return stats
 
 
 def load_index(kb: GraphRAGKnowledgeBase) -> GraphIndex:
@@ -81,6 +128,345 @@ def load_index(kb: GraphRAGKnowledgeBase) -> GraphIndex:
     if kb.backend == "astradb":
         return _astra_load(kb)
     return _arango_load(kb)
+
+
+def load_subgraph(
+    kb: GraphRAGKnowledgeBase,
+    *,
+    entity_ids: list[str],
+    include_neighbors: bool = True,
+) -> GraphIndex:
+    """按种子实体加载局部子图，避免 Local Search 每次全量拉库。
+
+    包含：种子(+邻居)实体、相关关系/原文/社区/报告/声明/文档。
+    若局部结果过空则回退 ``load_index``。
+    """
+    seeds = [str(x).strip() for x in entity_ids if str(x).strip()]
+    if not seeds:
+        return load_index(kb)
+    ensure_kg_schema(kb, create_if_missing=False)
+    try:
+        if kb.backend == "astradb":
+            partial = _astra_load_subgraph(kb, seeds, include_neighbors=include_neighbors)
+        else:
+            partial = _arango_load_subgraph(kb, seeds, include_neighbors=include_neighbors)
+    except Exception:
+        return load_index(kb)
+    if not partial.entities:
+        return load_index(kb)
+    return partial
+
+
+def _norm_title(title: str) -> str:
+    return "".join((title or "").split()).casefold()
+
+
+def _expand_entity_neighborhood(
+    entities: list[Entity],
+    relationships: list[Relationship],
+    seed_ids: list[str],
+    *,
+    include_neighbors: bool,
+) -> tuple[list[Entity], list[Relationship]]:
+    by_id = {e.id: e for e in entities}
+    seeds = [by_id[i] for i in seed_ids if i in by_id]
+    if not seeds:
+        return [], []
+    seed_titles = {_norm_title(e.title) for e in seeds}
+    seed_id_set = {e.id for e in seeds}
+    rels = [
+        r
+        for r in relationships
+        if _norm_title(r.source) in seed_titles or _norm_title(r.target) in seed_titles
+    ]
+    keep_ids = set(seed_id_set)
+    if include_neighbors:
+        neighbor_titles = {_norm_title(r.source) for r in rels} | {
+            _norm_title(r.target) for r in rels
+        }
+        for e in entities:
+            if _norm_title(e.title) in neighbor_titles:
+                keep_ids.add(e.id)
+    kept_entities = [by_id[i] for i in keep_ids if i in by_id]
+    kept_titles = {_norm_title(e.title) for e in kept_entities}
+    kept_rels = [
+        r
+        for r in relationships
+        if _norm_title(r.source) in kept_titles or _norm_title(r.target) in kept_titles
+    ]
+    return kept_entities, kept_rels
+
+
+def _slice_index_for_entities(
+    full: GraphIndex,
+    seed_ids: list[str],
+    *,
+    include_neighbors: bool,
+) -> GraphIndex:
+    entities, relationships = _expand_entity_neighborhood(
+        full.entities, full.relationships, seed_ids, include_neighbors=include_neighbors
+    )
+    if not entities:
+        return GraphIndex()
+    unit_ids: list[str] = []
+    community_ids: list[str] = []
+    for e in entities:
+        unit_ids.extend(e.text_unit_ids)
+        community_ids.extend(e.community_ids)
+    for r in relationships:
+        unit_ids.extend(r.text_unit_ids or [])
+    unit_ids = list(dict.fromkeys(unit_ids))
+    community_ids = list(dict.fromkeys(community_ids))
+    units = [u for u in full.text_units if u.id in set(unit_ids)]
+    reports = [r for r in full.community_reports if r.community_id in set(community_ids)]
+    communities = [c for c in full.communities if c.id in set(community_ids)]
+    seed_titles = {_norm_title(e.title) for e in entities}
+    covariates = [c for c in full.covariates if _norm_title(c.subject) in seed_titles]
+    doc_ids = {u.document_id for u in units if u.document_id}
+    documents = [d for d in full.documents if d.id in doc_ids]
+    return GraphIndex(
+        text_units=units,
+        entities=entities,
+        relationships=relationships,
+        communities=communities,
+        community_reports=reports,
+        covariates=covariates,
+        documents=documents,
+    )
+
+
+def _astra_load_by_ids(col, ids: list[str]) -> list[dict[str, Any]]:
+    if not ids:
+        return []
+    out: list[dict[str, Any]] = []
+    # Data API 支持 $in；失败则逐条 get
+    try:
+        rows = list(col.find({"_id": {"$in": ids}}, limit=max(100, len(ids) * 2)))
+        if rows:
+            return rows
+    except Exception:
+        pass
+    for i in ids:
+        try:
+            doc = col.find_one({"_id": i})
+            if doc:
+                out.append(doc)
+                continue
+        except Exception:
+            pass
+        try:
+            doc = col.find_one({"id": i})
+            if doc:
+                out.append(doc)
+        except Exception:
+            continue
+    return out
+
+
+def _astra_load_subgraph(
+    kb: GraphRAGKnowledgeBase, seed_ids: list[str], *, include_neighbors: bool
+) -> GraphIndex:
+    """Astra：按 id 拉取实体/原文等；关系集合通常较小，整表读后在内存过滤。"""
+    db = _astra_db(kb)
+    names = _names(kb)
+    seed_docs = _astra_load_by_ids(db.get_collection(names["entities"]), seed_ids)
+    if not seed_docs:
+        return GraphIndex()
+
+    try:
+        rel_docs = _astra_load_all(db.get_collection(names["relationships"]))
+    except Exception:
+        rel_docs = []
+
+    seed_titles = {
+        "".join(str(d.get("title") or "").split()).casefold() for d in seed_docs
+    }
+    kept_rels = [
+        d
+        for d in rel_docs
+        if "".join(str(d.get("source") or "").split()).casefold() in seed_titles
+        or "".join(str(d.get("target") or "").split()).casefold() in seed_titles
+    ]
+    neighbor_titles = set(seed_titles)
+    if include_neighbors:
+        for d in kept_rels:
+            neighbor_titles.add("".join(str(d.get("source") or "").split()).casefold())
+            neighbor_titles.add("".join(str(d.get("target") or "").split()).casefold())
+        # 邻居实体：关系表读完后，按需再扫实体集合（比全量 chunks 便宜）
+        try:
+            all_ents = _astra_load_all(db.get_collection(names["entities"]))
+            ent_docs = [
+                d
+                for d in all_ents
+                if "".join(str(d.get("title") or "").split()).casefold() in neighbor_titles
+            ]
+        except Exception:
+            ent_docs = seed_docs
+        # 扩展关系覆盖邻居
+        kept_rels = [
+            d
+            for d in rel_docs
+            if "".join(str(d.get("source") or "").split()).casefold() in neighbor_titles
+            or "".join(str(d.get("target") or "").split()).casefold() in neighbor_titles
+        ]
+    else:
+        ent_docs = seed_docs
+
+    unit_ids: list[str] = []
+    community_ids: list[str] = []
+    for d in ent_docs:
+        unit_ids.extend([str(x) for x in (d.get("text_unit_ids") or []) if x])
+        community_ids.extend([str(x) for x in (d.get("community_ids") or []) if x])
+    for d in kept_rels:
+        unit_ids.extend([str(x) for x in (d.get("text_unit_ids") or []) if x])
+    unit_ids = list(dict.fromkeys(unit_ids))
+    community_ids = list(dict.fromkeys(community_ids))
+
+    chunk_docs = _astra_load_by_ids(db.get_collection(names["chunks"]), unit_ids)
+    community_docs = _astra_load_by_ids(db.get_collection(names["communities"]), community_ids)
+    report_docs: list[dict[str, Any]] = []
+    if community_ids:
+        try:
+            report_docs = list(
+                db.get_collection(names["reports"]).find(
+                    {"community_id": {"$in": community_ids}},
+                    limit=max(50, len(community_ids) * 5),
+                )
+            )
+        except Exception:
+            try:
+                report_docs = [
+                    d
+                    for d in _astra_load_all(db.get_collection(names["reports"]))
+                    if str(d.get("community_id") or "") in set(community_ids)
+                ]
+            except Exception:
+                report_docs = []
+    cov_docs: list[dict[str, Any]] = []
+    try:
+        all_cov = _astra_load_all(db.get_collection(names["covariates"]))
+        cov_docs = [
+            d
+            for d in all_cov
+            if "".join(str(d.get("subject") or "").split()).casefold() in neighbor_titles
+        ]
+    except Exception:
+        cov_docs = []
+    doc_ids = list(
+        dict.fromkeys(str(d.get("document_id")) for d in chunk_docs if d.get("document_id"))
+    )
+    document_docs = _astra_load_by_ids(db.get_collection(names["documents"]), doc_ids)
+    return _dicts_to_index(
+        chunk_docs,
+        ent_docs,
+        kept_rels,
+        community_docs,
+        report_docs,
+        cov_docs,
+        document_docs,
+    )
+
+
+def _arango_load_subgraph(
+    kb: GraphRAGKnowledgeBase, seed_ids: list[str], *, include_neighbors: bool
+) -> GraphIndex:
+    db = _arango_db(kb)
+    names = _names(kb)
+
+    def _by_ids(col_name: str, ids: list[str], id_field: str = "id") -> list[dict[str, Any]]:
+        if not ids or not db.has_collection(col_name):
+            return []
+        aql = f"""
+        FOR d IN `{col_name}`
+          FILTER d.`{id_field}` IN @ids OR d._key IN @ids
+          RETURN d
+        """
+        return list(db.aql.execute(aql, bind_vars={"ids": ids}))
+
+    seed_docs = _by_ids(names["entities"], seed_ids)
+    if not seed_docs:
+        return GraphIndex()
+    # 关系：标题匹配需要先有种子标题
+    seed_titles = [
+        "".join(str(d.get("title") or "").split()).casefold() for d in seed_docs
+    ]
+    rel_docs: list[dict[str, Any]] = []
+    if db.has_collection(names["relationships"]):
+        aql = f"""
+        FOR d IN `{names["relationships"]}`
+          LET s = LOWER(SUBSTITUTE(d.source, " ", ""))
+          LET t = LOWER(SUBSTITUTE(d.target, " ", ""))
+          FILTER s IN @titles OR t IN @titles
+          RETURN d
+        """
+        try:
+            rel_docs = list(db.aql.execute(aql, bind_vars={"titles": seed_titles}))
+        except Exception:
+            rel_docs = list(db.aql.execute(f"FOR d IN `{names['relationships']}` RETURN d"))
+
+    neighbor_titles = set(seed_titles)
+    for d in rel_docs:
+        neighbor_titles.add("".join(str(d.get("source") or "").split()).casefold())
+        neighbor_titles.add("".join(str(d.get("target") or "").split()).casefold())
+
+    ent_docs = seed_docs
+    if include_neighbors and db.has_collection(names["entities"]):
+        aql = f"""
+        FOR d IN `{names["entities"]}`
+          LET t = LOWER(SUBSTITUTE(d.title, " ", ""))
+          FILTER t IN @titles
+          RETURN d
+        """
+        try:
+            ent_docs = list(db.aql.execute(aql, bind_vars={"titles": list(neighbor_titles)}))
+        except Exception:
+            ent_docs = seed_docs
+
+    unit_ids: list[str] = []
+    community_ids: list[str] = []
+    for d in ent_docs:
+        unit_ids.extend(d.get("text_unit_ids") or [])
+        community_ids.extend(d.get("community_ids") or [])
+    for d in rel_docs:
+        unit_ids.extend(d.get("text_unit_ids") or [])
+    unit_ids = list(dict.fromkeys(str(x) for x in unit_ids if x))
+    community_ids = list(dict.fromkeys(str(x) for x in community_ids if x))
+
+    chunk_docs = _by_ids(names["chunks"], unit_ids)
+    community_docs = _by_ids(names["communities"], community_ids)
+    report_docs: list[dict[str, Any]] = []
+    if community_ids and db.has_collection(names["reports"]):
+        aql = f"""
+        FOR d IN `{names["reports"]}`
+          FILTER d.community_id IN @cids
+          RETURN d
+        """
+        report_docs = list(db.aql.execute(aql, bind_vars={"cids": community_ids}))
+    cov_docs: list[dict[str, Any]] = []
+    if db.has_collection(names["covariates"]):
+        aql = f"""
+        FOR d IN `{names["covariates"]}`
+          LET s = LOWER(SUBSTITUTE(d.subject, " ", ""))
+          FILTER s IN @titles
+          RETURN d
+        """
+        try:
+            cov_docs = list(db.aql.execute(aql, bind_vars={"titles": list(neighbor_titles)}))
+        except Exception:
+            cov_docs = []
+    doc_ids = list(
+        dict.fromkeys(str(d.get("document_id")) for d in chunk_docs if d.get("document_id"))
+    )
+    document_docs = _by_ids(names["documents"], doc_ids)
+    return _dicts_to_index(
+        chunk_docs,
+        ent_docs,
+        rel_docs,
+        community_docs,
+        report_docs,
+        cov_docs,
+        document_docs,
+    )
 
 
 def clear_index(kb: GraphRAGKnowledgeBase) -> dict[str, Any]:
@@ -147,13 +533,38 @@ def _embed_index(index: GraphIndex, embedding: Embeddings) -> None:
 
 
 def _astra_db(kb: GraphRAGKnowledgeBase):
+    """连接 Astra 云或本地/自建 Data API（HCD）。"""
     from astrapy import DataAPIClient
+    from astrapy.authentication import UsernamePasswordTokenProvider
+    from astrapy.constants import Environment
 
-    if not kb.api_endpoint or not kb.token:
-        msg = "AstraDB 需要填写 API Endpoint 与 Token。"
+    endpoint = (kb.api_endpoint or "").strip()
+    if not endpoint:
+        msg = "Astra/Data API 需要填写 API Endpoint（云上 Astra 或本地 http://host:8181）。"
         raise ValueError(msg)
-    client = DataAPIClient(kb.token)
-    return client.get_database(kb.api_endpoint, token=kb.token, keyspace=kb.keyspace or None)
+
+    env_name = (kb.data_api_environment or "astra").strip().lower()
+    keyspace = (kb.keyspace or "default_keyspace").strip() or None
+
+    if env_name == "hcd":
+        user = (kb.data_api_username or "").strip()
+        password = kb.data_api_password or ""
+        if not user:
+            msg = (
+                "本地/自建 Data API（HCD）需要填写用户名与密码。"
+                "请在知识库组件高级选项中配置，或设置 data_api_username/password。"
+            )
+            raise ValueError(msg)
+        token = UsernamePasswordTokenProvider(user, password)
+        client = DataAPIClient(environment=Environment.HCD)
+        return client.get_database(endpoint, token=token, keyspace=keyspace)
+
+    token = (kb.token or "").strip()
+    if not token:
+        msg = "AstraDB 云环境需要填写 Application Token。"
+        raise ValueError(msg)
+    client = DataAPIClient(token)
+    return client.get_database(endpoint, token=token, keyspace=keyspace)
 
 
 def _astra_ensure(
@@ -181,19 +592,36 @@ def _astra_replace_collection(db, name: str, docs: list[dict[str, Any]]) -> None
         col.insert_many(docs)
 
 
+def _astra_doc(doc_id: str, data: dict[str, Any], vector: list[float] | None = None) -> dict[str, Any]:
+    payload = {"_id": doc_id, **data}
+    if vector:
+        payload["$vector"] = vector
+    return payload
+
+
 def _astra_persist(
     kb: GraphRAGKnowledgeBase, index: GraphIndex, *, replace: bool
 ) -> dict[str, Any]:
     db = _astra_db(kb)
     names = _names(kb)
+    use_ann = bool(kb.use_vector_index)
     payload = {
-        names["chunks"]: [{"_id": u.id, **u.to_dict()} for u in index.text_units],
-        names["entities"]: [{"_id": e.id, **e.to_dict()} for e in index.entities],
-        names["relationships"]: [{"_id": r.id, **r.to_dict()} for r in index.relationships],
-        names["communities"]: [{"_id": c.id, **c.to_dict()} for c in index.communities],
-        names["reports"]: [{"_id": r.id, **r.to_dict()} for r in index.community_reports],
-        names["covariates"]: [{"_id": c.id, **c.to_dict()} for c in index.covariates],
-        names["documents"]: [{"_id": d.id, **d.to_dict()} for d in index.documents],
+        names["chunks"]: [
+            _astra_doc(u.id, u.to_dict(), u.embedding if use_ann else None)
+            for u in index.text_units
+        ],
+        names["entities"]: [
+            _astra_doc(e.id, e.to_dict(), e.description_embedding if use_ann else None)
+            for e in index.entities
+        ],
+        names["relationships"]: [_astra_doc(r.id, r.to_dict()) for r in index.relationships],
+        names["communities"]: [_astra_doc(c.id, c.to_dict()) for c in index.communities],
+        names["reports"]: [
+            _astra_doc(r.id, r.to_dict(), r.embedding if use_ann else None)
+            for r in index.community_reports
+        ],
+        names["covariates"]: [_astra_doc(c.id, c.to_dict()) for c in index.covariates],
+        names["documents"]: [_astra_doc(d.id, d.to_dict()) for d in index.documents],
     }
     if replace:
         for name, docs in payload.items():

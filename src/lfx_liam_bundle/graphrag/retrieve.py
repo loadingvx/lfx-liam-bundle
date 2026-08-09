@@ -1,4 +1,4 @@
-"""统一检索入口：Local Search / Global Search。"""
+"""统一检索入口：Local / Global / DRIFT Search。"""
 
 from __future__ import annotations
 
@@ -7,11 +7,12 @@ from typing import Any
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
 
+from lfx_liam_bundle.graphrag.drift_search import drift_search
 from lfx_liam_bundle.graphrag.global_search import global_search
 from lfx_liam_bundle.graphrag.local_search import local_search
 from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
-SEARCH_MODES = ["Local Search", "Global Search"]
+SEARCH_MODES = ["Local Search", "Global Search", "DRIFT Search"]
 
 
 def retrieve_documents(
@@ -26,6 +27,16 @@ def retrieve_documents(
     top_k_chunks: int = 6,
     answer_with_llm: bool = True,
     dynamic_community_selection: bool = False,
+    max_context_tokens: int = 8000,
+    text_unit_prop: float = 0.5,
+    community_prop: float = 0.25,
+    conversation_history: str | None = None,
+    response_type: str = "多段落中文回答",
+    allow_general_knowledge: bool = False,
+    map_concurrency: int = 1,
+    drift_n_depth: int = 2,
+    drift_top_k_reports: int = 5,
+    drift_max_follow_ups: int = 3,
 ) -> tuple[list[Document], str, dict[str, Any]]:
     if not (query or "").strip():
         msg = "检索问题不能为空。"
@@ -42,10 +53,38 @@ def retrieve_documents(
             llm,
             community_level=community_level,
             dynamic_community_selection=dynamic_community_selection,
+            max_data_tokens=max_context_tokens,
+            conversation_history=conversation_history,
+            response_type=response_type,
+            allow_general_knowledge=allow_general_knowledge,
+            map_concurrency=map_concurrency,
+        )
+    if mode == "DRIFT Search":
+        if embedding is None:
+            msg = "DRIFT Search 需要 Embedding 模型。"
+            raise ValueError(msg)
+        if llm is None:
+            msg = "DRIFT Search 必须连接 LLM。"
+            raise ValueError(msg)
+        return drift_search(
+            kb,
+            query,
+            embedding,
+            llm,
+            n_depth=drift_n_depth,
+            top_k_reports=drift_top_k_reports,
+            top_k_entities=top_k_entities,
+            top_k_chunks=top_k_chunks,
+            max_follow_ups=drift_max_follow_ups,
+            max_context_tokens=max_context_tokens,
+            text_unit_prop=text_unit_prop,
+            community_prop=community_prop,
+            conversation_history=conversation_history,
+            response_type=response_type,
         )
     if mode == "Local Search":
         if embedding is None:
-            msg = "Local Search 需要 Embedding 模型（实体描述向量检索）。请连接 Embedding。"
+            msg = "Local Search 需要 Embedding 模型。请连接 Embedding。"
             raise ValueError(msg)
         return local_search(
             kb,
@@ -55,6 +94,14 @@ def retrieve_documents(
             top_k_entities=top_k_entities,
             top_k_chunks=top_k_chunks,
             answer_with_llm=answer_with_llm,
+            max_context_tokens=max_context_tokens,
+            text_unit_prop=text_unit_prop,
+            community_prop=community_prop,
+            conversation_history=conversation_history,
+            response_type=response_type,
         )
-    msg = f"不支持的检索模式：{mode}。请选择 Local Search 或 Global Search。"
+    msg = (
+        f"不支持的检索模式：{mode}。"
+        "请选择 Local Search、Global Search 或 DRIFT Search。"
+    )
     raise ValueError(msg)

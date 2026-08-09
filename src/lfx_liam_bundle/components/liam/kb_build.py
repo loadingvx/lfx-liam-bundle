@@ -1,4 +1,4 @@
-"""建库侧：完整 GraphRAG 索引流水线（抽取+Gleaning+分层社区+报告+向量化）。"""
+"""建库侧：完整 GraphRAG 索引流水线。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from lfx.custom.custom_component.component import Component
 from lfx.io import BoolInput, DropdownInput, HandleInput, IntInput, Output, StrInput
 from lfx.schema.data import Data
 
+from lfx_liam_bundle.graphrag.chunking import DEFAULT_CHUNK_OVERLAP, DEFAULT_CHUNK_SIZE
 from lfx_liam_bundle.graphrag.extract_graph import DEFAULT_ENTITY_TYPES
 from lfx_liam_bundle.graphrag.pipeline import run_indexing_pipeline
 from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
@@ -14,8 +15,8 @@ from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 class GraphRAGKBBuildComponent(Component):
     display_name = "GraphRAG 入库建图"
     description = (
-        "完整 GraphRAG 建库：TextUnit→实体/关系抽取（含 Data Gleaning）→"
-        "分层社区检测→社区报告→向量索引落库。"
+        "GraphRAG 建库：标准（LLM 抽取+Gleaning）或 FastGraphRAG（NLP 名词短语+共现，更便宜）。"
+        "随后 Leiden 社区→社区报告→向量落库+ANN 索引。"
     )
     name = "LiamGraphRAGBuild"
     icon = "DatabaseZap"
@@ -33,63 +34,85 @@ class GraphRAGKBBuildComponent(Component):
             display_name="待入库文档",
             input_types=["Data", "DataFrame", "Table"],
             is_list=True,
-            info="文档或文本块（TextUnit）列表。建议先切分再入库。",
+            info="原始文档或已切分文本。默认会按 token 再切成 TextUnit（可关闭）。",
             required=True,
         ),
         HandleInput(
             name="embedding_model",
             display_name="Embedding 模型",
             input_types=["Embeddings"],
-            info="用于 TextUnit / 实体描述 / 社区报告向量化（Local Search 依赖）。",
             required=True,
         ),
         HandleInput(
             name="llm",
             display_name="语言模型 LLM",
             input_types=["LanguageModel"],
-            info="必须连接：实体关系抽取、Data Gleaning、社区报告均依赖 LLM。",
+            info="标准模式：抽取+报告。FastGraphRAG：仅社区报告需要 LLM。",
             required=True,
+        ),
+        DropdownInput(
+            name="indexing_method",
+            display_name="建图模式",
+            options=["标准 GraphRAG", "FastGraphRAG"],
+            value="标准 GraphRAG",
+            info=(
+                "标准：LLM 实体/关系+Gleaning（质量高、更贵）。"
+                "FastGraphRAG：NLP 名词短语+共现关系（更快更便宜，图更噪，适合偏 Global 摘要）。"
+            ),
+        ),
+        BoolInput(
+            name="chunk_enabled",
+            display_name="启用内置 token 切块",
+            value=True,
+            info="对齐微软 Phase 1。关闭则把每条输入当作一个 TextUnit。",
+        ),
+        IntInput(
+            name="chunk_size",
+            display_name="切块大小（tokens）",
+            value=DEFAULT_CHUNK_SIZE,
+            advanced=True,
+            info="默认 1200（微软默认同量级）。",
+        ),
+        IntInput(
+            name="chunk_overlap",
+            display_name="切块重叠（tokens）",
+            value=DEFAULT_CHUNK_OVERLAP,
+            advanced=True,
         ),
         IntInput(
             name="max_gleanings",
             display_name="Gleaning 轮数",
             value=1,
-            info="Data Gleaning 补抽轮数（对齐微软 GraphRAG）。建议 1~2；0 表示关闭补抽。",
         ),
         BoolInput(
             name="extract_claims",
             display_name="抽取事实声明 Claims",
             value=False,
             advanced=True,
-            info="可选（微软默认关闭）。开启后额外抽取 Covariates，供 Local Search 使用，费用更高。",
         ),
         IntInput(
             name="max_cluster_size",
             display_name="社区最大规模",
             value=10,
             advanced=True,
-            info="分层社区递归分裂阈值（实体数）。",
         ),
         IntInput(
             name="max_community_levels",
             display_name="社区最大层数",
             value=3,
             advanced=True,
-            info="社区层次深度。层数越多，Global Search 粒度越细。",
         ),
         StrInput(
             name="entity_types",
             display_name="实体类型",
             value="、".join(DEFAULT_ENTITY_TYPES),
             advanced=True,
-            info="逗号/顿号分隔的实体类型约束。",
         ),
         DropdownInput(
             name="write_mode",
             display_name="写入模式",
             options=["重建索引", "追加合并"],
             value="重建索引",
-            info="重建：清空后全量写入。追加：与已有实体/关系合并后重建社区与报告。",
         ),
     ]
 
@@ -106,6 +129,11 @@ class GraphRAGKBBuildComponent(Component):
         types_raw = (self.entity_types or "").replace("，", "、").replace(",", "、")
         entity_types = [x.strip() for x in types_raw.split("、") if x.strip()]
         replace = (self.write_mode or "重建索引") == "重建索引"
+        method = (
+            "fast"
+            if (self.indexing_method or "").startswith("Fast")
+            else "standard"
+        )
         try:
             kb, _index, summary = run_indexing_pipeline(
                 kb,
@@ -117,12 +145,15 @@ class GraphRAGKBBuildComponent(Component):
                 max_community_levels=int(self.max_community_levels or 3),
                 entity_types=entity_types or None,
                 replace=replace,
-                extract_claims=bool(self.extract_claims),
+                extract_claims=bool(self.extract_claims) and method == "standard",
+                chunk_enabled=bool(self.chunk_enabled),
+                chunk_size=int(self.chunk_size or DEFAULT_CHUNK_SIZE),
+                chunk_overlap=int(self.chunk_overlap if self.chunk_overlap is not None else DEFAULT_CHUNK_OVERLAP),
+                indexing_method=method,
             )
         except Exception as e:
             msg = f"GraphRAG 建库失败：{e}"
             raise ValueError(msg) from e
-
         self._last_summary = summary
         self._last_kb = kb
         self.status = kb.message
@@ -136,5 +167,4 @@ class GraphRAGKBBuildComponent(Component):
         if self._last_summary is None:
             self._run_build()
         summary = self._last_summary or {}
-        text = summary.get("message") or "建库完成"
-        return Data(text=text, data=summary)
+        return Data(text=summary.get("message") or "建库完成", data=summary)

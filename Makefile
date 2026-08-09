@@ -6,7 +6,7 @@ SHELL := /bin/bash
 ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 export MISE_TRUSTED_CONFIG_PATHS := $(if $(MISE_TRUSTED_CONFIG_PATHS),$(MISE_TRUSTED_CONFIG_PATHS):)$(ROOT)/mise.toml
 
-.PHONY: help setup sync validate test lint format check build deploy-docker clean
+.PHONY: help setup sync validate check-versions test lint format check build deploy-docker clean
 
 help: ## 显示可用命令
 	@awk 'BEGIN {FS = ":.*##"; printf "\nTargets:\n" } \
@@ -32,6 +32,9 @@ sync: ## 同步依赖（含 dev）
 validate: ## 校验 extension manifest
 	@$(call RUN_UV,run lfx extension validate .)
 
+check-versions: ## 校验 pyproject 与两份 extension.json 版本一致
+	@$(ROOT)/scripts/check-versions.sh
+
 test: ## 运行单元测试
 	@$(call RUN_UV,run pytest)
 
@@ -43,7 +46,7 @@ format: ## ruff 自动格式化
 	@$(call RUN_UV,run ruff check --fix src tests)
 	@$(call RUN_UV,run ruff format src tests)
 
-check: validate lint test ## 发布前本地门禁
+check: check-versions validate lint test ## 发布前本地门禁
 
 build: ## 构建 sdist + wheel 到 dist/
 	@rm -rf $(ROOT)/dist
