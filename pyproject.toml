@@ -1,9 +1,9 @@
 [project]
 name = "lfx-liam-bundle"
-version = "0.0.1"
+version = "0.0.3"
 description = "Liam's personal Langflow extension toolkit (liam bundle). Currently ships GraphRAG components; more tools can be added under the same package."
 readme = "README.md"
-# 与 lfx 一致；本地 mise / PyPI 构建均以 3.10 为基准
+# Align with lfx; local mise and PyPI builds use 3.10 as the baseline.
 requires-python = ">=3.10,<3.15"
 license = { text = "MIT" }
 authors = [{ name = "Liam" }]
@@ -32,7 +32,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    # 运行时由 Langflow 环境提供 lfx；此处声明兼容范围，便于本地开发解析。
+    # Runtime lfx comes from the Langflow environment; declare a compatible range for local resolution.
     "lfx>=1.11.0,<2.0.0",
     "astrapy>=2.1.0,<3.0.0",
     "python-arango>=8.0.0,<9.0.0",
@@ -81,9 +81,9 @@ include = [
 ]
 
 [tool.uv]
-# 本地开发优先用旁边 langflow 仓库里的 lfx 源码，版本与现网 docker 一致。
+# Prefer sibling langflow repo lfx for local development (match docker runtime).
 package = true
-# 与 mise.toml / .python-version / PyPI 构建一致：最低即开发基准 3.10
+# Align with mise.toml / .python-version / PyPI: baseline Python 3.10.
 python-preference = "managed"
 
 [tool.uv.sources]
@@ -103,12 +103,12 @@ dev = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src", "."]
-# 默认不跑真库集成测试；用 ./devops/test-integration.sh
+# Skip real-DB integration by default; use ./devops/test-integration.sh
 addopts = ["-q", "--strict-markers", "-m", "not integration"]
 markers = [
-    "integration: 真实数据库集成测试（需 ./devops/db-up.sh 或云凭证）",
-    "arango: 针对 ArangoDB 的集成测试",
-    "astra: 针对 Astra 云或本地 Data API(HCD) 的集成测试",
+    "integration: real database integration tests (need ./devops/db-up.sh or cloud credentials)",
+    "arango: ArangoDB integration tests",
+    "astra: Astra cloud or local Data API (HCD) integration tests",
 ]
 
 [tool.coverage.run]
@@ -137,12 +137,12 @@ select = [
     "RUF", # ruff-specific
 ]
 ignore = [
-    "E501",   # 组件中文文案较长，由阅读性优先
-    "RUF001", # 中文全角标点（字符串）属预期
-    "RUF002", # 中文全角标点（docstring）属预期
-    "RUF003", # 中文全角标点（注释）属预期
-    "RUF012", # Langflow Component 的 inputs/outputs 类属性惯用可变默认
-    "SIM105", # 存储适配器中 try/except/pass 清理失败可接受
+    "E501",   # Long help strings in components are intentional
+    "RUF001", # Fullwidth punctuation in strings (legacy / bilingual samples)
+    "RUF002", # Fullwidth punctuation in docstrings
+    "RUF003", # Fullwidth punctuation in comments
+    "RUF012", # Langflow Component inputs/outputs commonly use mutable class defaults
+    "SIM105", # try/except/pass cleanup in storage adapters is acceptable
 ]
 
 [tool.ruff.lint.isort]

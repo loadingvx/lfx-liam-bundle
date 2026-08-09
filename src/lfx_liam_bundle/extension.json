@@ -1,7 +1,7 @@
 {
   "$schema": "https://schemas.langflow.org/extension/v1.json",
   "id": "lfx-liam-bundle",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "name": "Liam Bundle",
   "description": "Liam's Langflow extension toolkit (liam). Ships GraphRAG components today; more tools can join the same bundle.",
   "lfx": {

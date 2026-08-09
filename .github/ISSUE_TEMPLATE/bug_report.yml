@@ -1,66 +1,66 @@
-name: Bug 报告
-description: 报告功能异常或不符合预期的行为
+name: Bug report
+description: Report unexpected behavior or a functional defect
 title: "[Bug]: "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        提交前请先搜索是否已有相同 Issue。**不要**粘贴真实 Token、密码或生产连接串。
+        Search existing issues first. **Do not** paste real tokens, passwords, or production connection strings.
   - type: textarea
     id: what-happened
     attributes:
-      label: 发生了什么
-      description: 用中文清楚描述现象与你期望的结果
-      placeholder: 例如：入库显示成功，但检索一直返回空列表……
+      label: What happened
+      description: Describe the observed behavior and what you expected.
+      placeholder: e.g. Indexing reports success, but retrieve always returns an empty list…
     validations:
       required: true
   - type: textarea
     id: reproduce
     attributes:
-      label: 复现步骤
-      description: 越具体越好（组件配置可脱敏）
+      label: Steps to reproduce
+      description: Be as specific as possible (redact secrets in component config).
       placeholder: |
-        1. 选择 ArangoDB 后端……
-        2. 运行入库建图……
+        1. Select the ArangoDB backend…
+        2. Run GraphRAG Index Builder…
         3. …
     validations:
       required: true
   - type: input
     id: version
     attributes:
-      label: 扩展版本
-      placeholder: 0.0.1（pip show lfx-liam-bundle）
+      label: Extension version
+      placeholder: 0.0.3 (pip show lfx-liam-bundle)
     validations:
       required: true
   - type: input
     id: langflow-version
     attributes:
-      label: Langflow / lfx 版本
+      label: Langflow / lfx version
       placeholder: langflow 1.11.x / lfx 1.11.x
     validations:
       required: true
   - type: dropdown
     id: backend
     attributes:
-      label: 知识库后端
+      label: Knowledge-base backend
       options:
         - AstraDB
         - ArangoDB
-        - 两者都有 / 不确定
+        - Both / unsure
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
-      label: 错误信息 / 日志（脱敏）
+      label: Error message / logs (redacted)
       render: text
   - type: checkboxes
     id: checks
     attributes:
-      label: 提交前确认
+      label: Before submitting
       options:
-        - label: 我已脱敏所有密钥与内网地址
+        - label: I redacted all secrets and private network addresses
           required: true
-        - label: 我已用 `lfx extension list` 或 UI 确认扩展已加载
+        - label: I confirmed the extension is loaded (`lfx extension list` or UI)
           required: false

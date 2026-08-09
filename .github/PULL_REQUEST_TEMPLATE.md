@@ -1,25 +1,25 @@
-## 摘要
+## Summary
 
-<!-- 用 1～3 句话说明改了什么、为什么改 -->
+<!-- 1–3 sentences: what changed and why -->
 
-## 变更类型
+## Change type
 
-- [ ] 功能（feat）
-- [ ] 修复（fix）
-- [ ] 文档（docs）
-- [ ] 重构（refactor）
-- [ ] 测试（test）
-- [ ] 构建 / CI（chore）
+- [ ] Feature
+- [ ] Fix
+- [ ] Docs
+- [ ] Refactor
+- [ ] Test
+- [ ] Build / CI (chore)
 
-## 测试计划
+## Test plan
 
-- [ ] `make check`（或 CI 全绿）
-- [ ] `lfx extension validate .` 通过
-- [ ] 相关单测已补充 / 更新
-- [ ] （如涉及 UI）在 Langflow 中搜索到组件并能跑通最小 Flow
-- [ ] 未在日志/截图中泄露 Token / 密码
+- [ ] `make check` (or CI green)
+- [ ] `lfx extension validate .` passes
+- [ ] Related unit tests added / updated
+- [ ] (If UI) Component searchable in Langflow; minimal flow runs
+- [ ] No tokens / passwords in logs or screenshots
 
-## 版本与清单
+## Version / manifest
 
-- [ ] 无需 bump 版本
-- [ ] 已 bump：`./scripts/bump-version.sh X.Y.Z`（或手改 `pyproject` + 两份 `extension.json`）并更新 `CHANGELOG.md`
+- [ ] No version bump needed
+- [ ] Bumped with `./scripts/bump-version.sh X.Y.Z` (or manually synced `pyproject` + both `extension.json`) and updated `CHANGELOG.md`

@@ -1,19 +1,20 @@
-# 在 GitHub Release 发布后，构建并上传到 PyPI（Trusted Publishing / OIDC，无需 API Token）。
-# 文档: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
+# Build and upload to PyPI after a GitHub Release is published
+# (Trusted Publishing / OIDC; no API token required).
+# Docs: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries
 #
-# 首次使用前请完成:
-# 1. GitHub 仓库 Settings → Environments → 新建环境 `pypi`（建议加 Required reviewers）
+# One-time setup:
+# 1. GitHub repo Settings → Environments → create `pypi` (optional required reviewers)
 # 2. PyPI → Account settings → Publishing → Add a new pending publisher:
 #      - PyPI Project Name: lfx-liam-bundle
 #      - Owner: loadingvx
 #      - Repository: lfx-liam-bundle
 #      - Workflow name: python-publish.yml
 #      - Environment name: pypi
-# 3. 发版前只 bump 手写三处版本（与 tag 一致；tag 可为 v0.0.1 或 0.0.1）：
-#      ./scripts/bump-version.sh 0.0.1
-#      即：pyproject.toml + 根/包内两份 extension.json
-#      （__version__ 由包装元数据派生，勿手写）
-# 4. 构建使用 Python 3.10（与 requires-python 最低版本一致；有 3.10 即可发版）
+# 3. Before release, bump the three handwritten versions (must match the tag; tag may be v0.0.3 or 0.0.3):
+#      ./scripts/bump-version.sh 0.0.3
+#      i.e. pyproject.toml + root/package extension.json
+#      (__version__ is derived from package metadata; do not hardcode)
+# 4. Build uses Python 3.10 (matches requires-python minimum)
 
 name: Publish to PyPI
 
@@ -42,15 +43,15 @@ jobs:
           set -euo pipefail
           REQ="$(sed -nE 's/^requires-python[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' pyproject.toml | head -n1)"
           echo "requires-python: ${REQ}"
-          # 最低门槛必须是 3.10（与 lfx / 本地 mise 一致）
+          # Minimum must be 3.10 (aligned with lfx / local mise)
           if [[ "${REQ}" != ">=3.10,"* && "${REQ}" != ">=3.10" && "${REQ}" != "~=3.10" ]]; then
-            echo "::error::requires-python 必须允许 3.10 作为最低版本，当前为: ${REQ}"
+            echo "::error::requires-python must allow 3.10 as the minimum; got: ${REQ}"
             exit 1
           fi
 
       - uses: actions/setup-python@v7
         with:
-          # 用最低支持版本构建，避免误引入仅更高版本可用的语法/依赖决议
+          # Build on the minimum supported version to avoid accidental higher-only syntax/deps
           python-version: "3.10"
 
       - name: Build release distributions
@@ -71,7 +72,7 @@ jobs:
     needs:
       - release-build
     permissions:
-      # Trusted Publishing (OIDC) 必需
+      # Required for Trusted Publishing (OIDC)
       id-token: write
 
     environment:

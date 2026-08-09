@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Langflow 官方 Extension 文档
+  - name: Langflow Extensions docs
     url: https://docs.langflow.org/extensions-quickstart
-    about: 搭建 / 校验 / 发布 extension 的官方说明
-  - name: 安全漏洞（请勿公开）
+    about: Official guide to build / validate / publish extensions
+  - name: Security vulnerability (do not report publicly)
     url: https://github.com/loadingvx/lfx-liam-bundle/security/advisories/new
-    about: 通过 Security Advisories 私下报告安全问题
+    about: Report security issues privately via Security Advisories

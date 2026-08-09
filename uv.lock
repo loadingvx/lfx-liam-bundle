@@ -1751,7 +1751,7 @@ integration = [
 
 [[package]]
 name = "lfx-liam-bundle"
-version = "0.0.1"
+version = "0.0.3"
 source = { editable = "." }
 dependencies = [
     { name = "astrapy" },
