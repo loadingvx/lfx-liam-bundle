@@ -3,7 +3,7 @@
   "id": "lfx-liam-bundle",
   "version": "0.0.1",
   "name": "Liam Bundle",
-  "description": "完整 GraphRAG：抽取/Gleaning/分层社区、Local/Global Search、Entity↔TextUnit 双向溯源。",
+  "description": "Liam 的 Langflow 扩展工具包（liam）。当前提供 GraphRAG 等控件，可在同一 bundle 下继续扩展。",
   "lfx": {
     "compat": [
       "1"

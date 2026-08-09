@@ -1,8 +1,7 @@
-"""lfx-liam-bundle: Liam GraphRAG Langflow Extension.
+"""lfx-liam-bundle：Liam 的 Langflow 扩展工具包。
 
-以知识库实例为边界，提供建库（入库/索引/建图）、检索与维护全流程组件。
-运行时由 Langflow 通过 ``langflow.extensions`` entry-point 发现
-``extension.json`` 并注册 bundle ``liam``。
+通过 ``langflow.extensions`` entry-point 发现 ``extension.json``，
+注册 bundle ``liam``。当前导出 GraphRAG 相关控件；后续其它能力也应挂在同一 bundle 下。
 """
 
 from __future__ import annotations

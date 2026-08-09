@@ -1,0 +1,44 @@
+# GraphRAG 本地目标库（集成测试 / 开发联调）
+#
+# 默认：ArangoDB 3.12 + --vector-index（覆盖本 Bundle 的 Arango ANN 全路径）
+# Astra：云上 AstraDB 或自建 Data API(HCD)。本机镜像源通常拉不到 HCD，
+#        集成测试通过环境变量接入（见 devops/env.integration.example）。
+#
+# 用法：
+#   ./devops/db-up.sh
+#   ./devops/test-integration.sh
+#   ./devops/db-down.sh
+
+name: lfx-liam-dbs
+
+services:
+  arangodb:
+    # 若本机 docker hub 超时，可先：
+    #   docker pull docker.m.daocloud.io/library/arangodb:3.12.4
+    #   docker tag docker.m.daocloud.io/library/arangodb:3.12.4 arangodb:3.12.4
+    image: arangodb:3.12.4
+    container_name: lfx-liam-arangodb
+    environment:
+      ARANGO_ROOT_PASSWORD: ${LFX_LIAM_ARANGO_PASSWORD:-liamtest}
+    ports:
+      - "${LFX_LIAM_ARANGO_PORT:-18529}:8529"
+    # 3.12.4 为实验开关；更高版本可能是 --vector-index
+    command: ["--experimental-vector-index", "true"]
+    healthcheck:
+      # 官方镜像未必带 curl；用 arangosh 探活
+      test:
+        [
+          "CMD-SHELL",
+          "arangosh --server.password \"$${ARANGO_ROOT_PASSWORD}\" --javascript.execute-string \"db._version()\" >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 5s
+      timeout: 8s
+      retries: 30
+      start_period: 20s
+    volumes:
+      - lfx-liam-arango-data:/var/lib/arangodb3
+      - lfx-liam-arango-apps:/var/lib/arangodb3-apps
+
+volumes:
+  lfx-liam-arango-data:
+  lfx-liam-arango-apps:

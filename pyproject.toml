@@ -1,7 +1,7 @@
 [project]
 name = "lfx-liam-bundle"
 version = "0.0.1"
-description = "Liam 完整 GraphRAG：实体关系抽取、Gleaning、分层社区、Local/Global Search（AstraDB / ArangoDB）。"
+description = "Liam's personal Langflow extension toolkit (liam bundle). Currently ships GraphRAG components; more tools can be added under the same package."
 readme = "README.md"
 # 与 lfx 一致；本地 mise / PyPI 构建均以 3.10 为基准
 requires-python = ">=3.10,<3.15"
@@ -13,11 +13,10 @@ keywords = [
     "lfx",
     "extension",
     "bundle",
+    "toolkit",
     "liam",
+    "components",
     "graphrag",
-    "knowledge-graph",
-    "astradb",
-    "arangodb",
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
