@@ -58,6 +58,7 @@ Deploy into a local Langflow Docker container (optional):
 Current GraphRAG support covers indexing (standard / FastGraphRAG), hierarchical communities, Local / Global / DRIFT retrieve, and vector ANN on AstraDB / ArangoDB.
 
 Documentation index: **[docs/index.md](docs/index.md)**  
+GraphRAG wiring (who connects to whom): **[docs/guides/graphrag-usage.md](docs/guides/graphrag-usage.md)**  
 Upstream concepts: [Microsoft GraphRAG](https://microsoft.github.io/graphrag/)
 
 ## Development

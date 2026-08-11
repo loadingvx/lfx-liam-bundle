@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from lfx.custom.custom_component.component import Component
 from lfx.io import BoolInput, DropdownInput, MessageTextInput, Output, SecretStrInput, StrInput
 from lfx.schema.data import Data
@@ -9,12 +11,35 @@ from lfx.schema.data import Data
 from lfx_liam_bundle.graphrag.kg_store import ensure_kg_schema, load_index
 from lfx_liam_bundle.graphrag.types import GraphRAGKnowledgeBase
 
+# Fields shown only for AstraDB / Data API
+_ASTRA_FIELDS = (
+    "api_endpoint",
+    "token",
+    "data_api_environment",
+    "keyspace",
+)
+# HCD credentials: only when Astra backend + environment == hcd
+_HCD_FIELDS = (
+    "data_api_username",
+    "data_api_password",
+)
+# Fields shown only for ArangoDB
+_ARANGO_FIELDS = (
+    "arango_url",
+    "arango_username",
+    "arango_password",
+    "arango_database",
+    "graph_name",
+    "vector_index_factory",
+)
+
 
 class GraphRAGKBInstanceComponent(Component):
     display_name = "GraphRAG Knowledge Base"
     description = (
         "Create or connect a GraphRAG knowledge-base instance (AstraDB / ArangoDB). "
-        "Build and retrieve flows share this instance."
+        "Build and retrieve flows share this instance. "
+        "Connection fields update when you switch the storage backend."
     )
     name = "LiamGraphRAGKB"
     icon = "Database"
@@ -25,8 +50,9 @@ class GraphRAGKBInstanceComponent(Component):
             display_name="Storage backend",
             options=["AstraDB", "ArangoDB"],
             value="AstraDB",
-            info="Supports AstraDB and ArangoDB only.",
+            info="Choose one backend. Only that backend's connection fields are shown.",
             required=True,
+            real_time_refresh=True,
         ),
         StrInput(
             name="kb_name",
@@ -52,15 +78,21 @@ class GraphRAGKBInstanceComponent(Component):
             value=True,
             info="Create target collections when they do not exist.",
         ),
+        # --- AstraDB / Data API (hidden when ArangoDB is selected) ---
         MessageTextInput(
             name="api_endpoint",
             display_name="Astra / Data API Endpoint",
             info="Cloud Astra endpoint, or local HCD Data API (e.g. http://localhost:8181).",
+            dynamic=True,
+            show=True,
+            required=True,
         ),
         SecretStrInput(
             name="token",
             display_name="Astra Token",
-            info="Required for cloud Astra. Local HCD uses username/password below.",
+            info="Required for cloud Astra (environment=astra). Local HCD uses username/password instead.",
+            dynamic=True,
+            show=True,
         ),
         DropdownInput(
             name="data_api_environment",
@@ -68,7 +100,10 @@ class GraphRAGKBInstanceComponent(Component):
             options=["astra", "hcd"],
             value="astra",
             advanced=True,
-            info="astra = cloud AstraDB; hcd = local/self-hosted Data API (username/password).",
+            info="astra = cloud AstraDB (Token); hcd = local/self-hosted Data API (username/password).",
+            dynamic=True,
+            show=True,
+            real_time_refresh=True,
         ),
         StrInput(
             name="data_api_username",
@@ -76,38 +111,54 @@ class GraphRAGKBInstanceComponent(Component):
             value="",
             advanced=True,
             info="Required for hcd only (e.g. cassandra).",
+            dynamic=True,
+            show=False,
         ),
         SecretStrInput(
             name="data_api_password",
             display_name="Data API password",
             advanced=True,
             info="Required for hcd only.",
+            dynamic=True,
+            show=False,
         ),
         StrInput(
             name="keyspace",
             display_name="Astra / Data API Keyspace",
             value="default_keyspace",
             advanced=True,
+            dynamic=True,
+            show=True,
         ),
+        # --- ArangoDB (hidden when AstraDB is selected) ---
         MessageTextInput(
             name="arango_url",
             display_name="ArangoDB URL",
             value="http://localhost:8529",
-            info="Required for ArangoDB.",
+            info="ArangoDB HTTP API URL (e.g. http://localhost:8529).",
+            dynamic=True,
+            show=False,
+            required=False,
         ),
         StrInput(
             name="arango_username",
             display_name="ArangoDB username",
             value="root",
+            dynamic=True,
+            show=False,
         ),
         SecretStrInput(
             name="arango_password",
             display_name="ArangoDB password",
+            dynamic=True,
+            show=False,
         ),
         StrInput(
             name="arango_database",
             display_name="ArangoDB database",
             value="_system",
+            dynamic=True,
+            show=False,
         ),
         StrInput(
             name="graph_name",
@@ -115,15 +166,18 @@ class GraphRAGKBInstanceComponent(Component):
             value="",
             advanced=True,
             info="Leave empty to use `{prefix}_kg_graph` automatically.",
+            dynamic=True,
+            show=False,
         ),
+        # --- Shared vector options ---
         BoolInput(
             name="use_vector_index",
             display_name="Enable vector ANN retrieval",
             value=True,
             info=(
                 "On by default. Astra uses `$vector` ANN; Arango creates Faiss vector indexes "
-                "(IVF+HNSW factory supported) and uses approximate AQL search. "
-                "On failure, exact cosine fallback is used by default so retrieve does not hard-fail."
+                "and uses approximate AQL search. On failure, exact cosine fallback is used by "
+                "default so retrieve does not hard-fail."
             ),
         ),
         BoolInput(
@@ -142,6 +196,8 @@ class GraphRAGKBInstanceComponent(Component):
                 "Arango only. Faiss factory string (default IVF+HNSW). "
                 "IVF list count is auto-adjusted for small corpora."
             ),
+            dynamic=True,
+            show=False,
         ),
         StrInput(
             name="metric",
@@ -156,28 +212,143 @@ class GraphRAGKBInstanceComponent(Component):
         Output(display_name="KB instance", name="kb_instance", method="build_kb"),
     ]
 
+    @staticmethod
+    def _cfg_value(build_config: dict, name: str, default: Any = None) -> Any:
+        field = build_config.get(name) or {}
+        if isinstance(field, dict):
+            return field.get("value", default)
+        return default
+
+    @staticmethod
+    def _set_show(build_config: dict, names: tuple[str, ...], *, show: bool) -> None:
+        for name in names:
+            if name in build_config and isinstance(build_config[name], dict):
+                build_config[name]["show"] = show
+
+    @staticmethod
+    def _set_required(build_config: dict, name: str, *, required: bool) -> None:
+        if name in build_config and isinstance(build_config[name], dict):
+            build_config[name]["required"] = required
+
+    def _apply_field_visibility(
+        self,
+        build_config: dict,
+        *,
+        backend: str | None,
+        data_api_environment: str | None,
+    ) -> dict:
+        is_astra = (backend or "AstraDB") == "AstraDB"
+        is_arango = not is_astra
+        env = (data_api_environment or "astra").strip().lower()
+        show_hcd = is_astra and env == "hcd"
+
+        self._set_show(build_config, _ASTRA_FIELDS, show=is_astra)
+        self._set_show(build_config, _HCD_FIELDS, show=show_hcd)
+        self._set_show(build_config, _ARANGO_FIELDS, show=is_arango)
+
+        # Required only for the active backend's primary connection field
+        self._set_required(build_config, "api_endpoint", required=is_astra)
+        self._set_required(build_config, "arango_url", required=is_arango)
+        self._set_required(build_config, "token", required=is_astra and env == "astra")
+        self._set_required(build_config, "data_api_username", required=show_hcd)
+        self._set_required(build_config, "data_api_password", required=show_hcd)
+
+        return build_config
+
+    def update_build_config(
+        self,
+        build_config: dict,
+        field_value: Any,
+        field_name: str | None = None,
+    ) -> dict:
+        """Show only fields that belong to the selected backend (and HCD when needed)."""
+        backend = self._cfg_value(build_config, "backend", "AstraDB")
+        data_api_environment = self._cfg_value(build_config, "data_api_environment", "astra")
+
+        if field_name == "backend":
+            backend = field_value or backend
+            if field_name in build_config and isinstance(build_config[field_name], dict):
+                build_config[field_name]["value"] = field_value
+        elif field_name == "data_api_environment":
+            data_api_environment = field_value or data_api_environment
+            if field_name in build_config and isinstance(build_config[field_name], dict):
+                build_config[field_name]["value"] = field_value
+        elif field_name is None:
+            # Initial template build: honor defaults already on the inputs
+            pass
+
+        return self._apply_field_visibility(
+            build_config,
+            backend=str(backend or "AstraDB"),
+            data_api_environment=str(data_api_environment or "astra"),
+        )
+
     def build_kb(self) -> Data:
-        backend = "astradb" if self.backend == "AstraDB" else "arangodb"
+        backend_label = (self.backend or "AstraDB").strip()
+        if backend_label not in {"AstraDB", "ArangoDB"}:
+            msg = "Storage backend must be AstraDB or ArangoDB."
+            raise ValueError(msg)
+
+        backend = "astradb" if backend_label == "AstraDB" else "arangodb"
+        data_api_environment = (
+            "hcd" if (self.data_api_environment or "astra") == "hcd" else "astra"
+        )
+
+        if backend == "astradb":
+            endpoint = (self.api_endpoint or "").strip()
+            if not endpoint:
+                msg = (
+                    "AstraDB is selected: fill Astra / Data API Endpoint "
+                    "(cloud Astra URL or local HCD, e.g. http://localhost:8181)."
+                )
+                raise ValueError(msg)
+            if data_api_environment == "astra" and not (self.token or "").strip():
+                msg = (
+                    "AstraDB cloud (environment=astra) requires Astra Token. "
+                    "For local HCD, set Data API environment to hcd and use username/password."
+                )
+                raise ValueError(msg)
+            if data_api_environment == "hcd" and (
+                not (self.data_api_username or "").strip() or not (self.data_api_password or "")
+            ):
+                msg = (
+                    "Data API environment is hcd: fill Data API username and Data API password "
+                    "(shown under Advanced)."
+                )
+                raise ValueError(msg)
+        else:
+            if not (self.arango_url or "").strip():
+                msg = "ArangoDB is selected: fill ArangoDB URL (e.g. http://localhost:8529)."
+                raise ValueError(msg)
+
         kb = GraphRAGKnowledgeBase(
             backend=backend,  # type: ignore[arg-type]
             name=(self.kb_name or "default").strip(),
             collection_name=(self.collection_name or "").strip(),
-            api_endpoint=(self.api_endpoint or "").strip(),
-            token=self.token or "",
-            keyspace=(self.keyspace or "default_keyspace").strip(),
-            data_api_environment=(  # type: ignore[arg-type]
-                "hcd" if (self.data_api_environment or "astra") == "hcd" else "astra"
-            ),
-            data_api_username=(self.data_api_username or "").strip(),
-            data_api_password=self.data_api_password or "",
-            arango_url=(self.arango_url or "").strip(),
-            arango_username=(self.arango_username or "root").strip(),
-            arango_password=self.arango_password or "",
-            arango_database=(self.arango_database or "_system").strip(),
-            graph_name=(self.graph_name or "").strip(),
+            api_endpoint=(self.api_endpoint or "").strip() if backend == "astradb" else "",
+            token=(self.token or "") if backend == "astradb" else "",
+            keyspace=(self.keyspace or "default_keyspace").strip()
+            if backend == "astradb"
+            else "default_keyspace",
+            data_api_environment=data_api_environment,  # type: ignore[arg-type]
+            data_api_username=(self.data_api_username or "").strip()
+            if backend == "astradb"
+            else "",
+            data_api_password=(self.data_api_password or "") if backend == "astradb" else "",
+            arango_url=(self.arango_url or "").strip() if backend == "arangodb" else "",
+            arango_username=(self.arango_username or "root").strip()
+            if backend == "arangodb"
+            else "root",
+            arango_password=(self.arango_password or "") if backend == "arangodb" else "",
+            arango_database=(self.arango_database or "_system").strip()
+            if backend == "arangodb"
+            else "_system",
+            graph_name=(self.graph_name or "").strip() if backend == "arangodb" else "",
             use_vector_index=bool(self.use_vector_index),
             ann_fallback_exact=bool(self.ann_fallback_exact),
-            vector_index_factory=(self.vector_index_factory or "IVF100_HNSW10,Flat").strip(),
+            vector_index_factory=(self.vector_index_factory or "IVF100_HNSW10,Flat").strip()
+            if backend == "arangodb"
+            else "IVF100_HNSW10,Flat",
             metric=(self.metric or "cosine").strip() or "cosine",
         )
         try:

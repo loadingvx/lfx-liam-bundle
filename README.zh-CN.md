@@ -62,6 +62,7 @@ GraphRAG 是本工具包**当前已提供**的一组控件与领域库，能力�
 详细说明（按组件维护）：**[docs/index.md](docs/index.md)**
 
 - 工具包总览：[docs/overview.md](docs/overview.md)  
+- GraphRAG 接线汇总（谁连谁）：[docs/guides/graphrag-usage.md](docs/guides/graphrag-usage.md)  
 - 最短 Flow：[docs/guides/quickstart.md](docs/guides/quickstart.md)  
 - Arango 排障：[docs/guides/arango.md](docs/guides/arango.md)
 

@@ -29,6 +29,7 @@ docs/
 |-----|---------|
 | [overview.md](overview.md) | Layering and how to extend |
 | [guides/install.md](guides/install.md) | Install into Langflow |
+| [guides/graphrag-usage.md](guides/graphrag-usage.md) | GraphRAG wiring: who connects to whom |
 | [guides/quickstart.md](guides/quickstart.md) | Minimal working flow |
 | [guides/arango.md](guides/arango.md) | ArangoDB setup and troubleshooting |
 

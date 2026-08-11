@@ -145,6 +145,6 @@ echo
 echo "部署完成。"
 echo "  UI:        http://localhost:5173"
 echo "  查找位置:  Components → 搜索 GraphRAG / Liam"
-echo "  组件:      GraphRAG 知识库 / 入库建图 / 检索 / 知识库维护"
+echo "  Components: GraphRAG Knowledge Base / Index Builder / Retrieve / Maintain / Provenance"
 echo "  校验:      docker compose exec langflow uv run lfx extension list"
 echo "  若看不到:  硬刷新浏览器（Ctrl+Shift+R），并确认本脚本未报错"

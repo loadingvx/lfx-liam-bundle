@@ -42,6 +42,7 @@ Optional:
 
 ## Related
 
+- [GraphRAG usage overview](graphrag-usage.md) (full wiring map)  
 - [Knowledge Base](../components/graphrag-kb.md)  
 - [Index Builder](../components/graphrag-build.md)  
 - [Retrieve](../components/graphrag-retrieve.md)  
