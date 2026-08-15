@@ -33,7 +33,7 @@ classifiers = [
 ]
 dependencies = [
     # Runtime lfx comes from the Agent++ environment; declare a compatible range for local resolution.
-    "lfx>=1.11.0,<2.0.0",
+    "lfx>=1.11.3,<2.0.0",
     "astrapy>=2.1.0,<3.0.0",
     "python-arango>=8.0.0,<9.0.0",
     "langchain-core>=0.3.0",
